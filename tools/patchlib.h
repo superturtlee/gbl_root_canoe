@@ -417,6 +417,202 @@ static INT64 calc_adrl_file_offset(const CHAR8* buffer, INT32 adrp_off, UINT64 l
     return (INT64)(target_va - load_base);
 }
 
+static INT64 find_cstring(const CHAR8* buffer, INT32 size, const CHAR8* needle) {
+    INT32 len = strlen(needle) + 1;
+    if (len <= 0 || size < len) return -1;
+    for (INT32 i = 0; i <= size - len; ++i) {
+        if (memcmp_patcher(buffer + i, needle, len) == 0) return i;
+    }
+    return -1;
+}
+
+static INT32 find_zero_run(const CHAR8* buffer, INT32 size, INT32 start, INT32 end, INT32 need) {
+    if (need <= 0) return -1;
+    if (start < 0) start = 0;
+    if (end > size) end = size;
+    if (start >= end) return -1;
+
+    INT32 run_start = -1;
+    INT32 run_len = 0;
+
+    for (INT32 i = start; i < end; ++i) {
+        if ((UINT8)buffer[i] == 0) {
+            if (run_start < 0) run_start = i;
+            run_len++;
+            if (run_len >= need) return run_start;
+        } else {
+            run_start = -1;
+            run_len = 0;
+        }
+    }
+    return -1;
+}
+
+static INT64 ensure_cstring(CHAR8* buffer, INT32 size, INT32* cursor, INT32 end, const CHAR8* needle) {
+    INT64 existing = find_cstring(buffer, size, needle);
+    if (existing >= 0) return existing;
+
+    INT32 len = strlen(needle) + 1;
+    if (*cursor < 0 || *cursor + len > end || *cursor + len > size) return -1;
+
+    memcpy_patcher(buffer + *cursor, needle, len);
+    existing = *cursor;
+    *cursor += len;
+    return existing;
+}
+
+static UINT32 encode_adrp_target(UINT8 rd, INT32 instr_off, UINT64 load_base, UINT64 target_off) {
+    INT64 pc_page = ((INT64)load_base + instr_off) & ~0xFFFLL;
+    INT64 target_page = ((INT64)load_base + (INT64)target_off) & ~0xFFFLL;
+    INT64 page_delta = (target_page - pc_page) >> 12;
+    UINT32 imm21 = (UINT32)((UINT64)page_delta & 0x1FFFFFULL);
+    UINT32 immlo = imm21 & 0x3u;
+    UINT32 immhi = (imm21 >> 2) & 0x7FFFFu;
+
+    return 0x90000000u | (immlo << 29) | (immhi << 5) | (rd & 0x1Fu);
+}
+
+static UINT32 encode_add_x_imm_target(UINT8 rd, UINT8 rn, UINT32 imm) {
+    UINT32 imm12 = 0;
+    UINT32 shift = 0;
+
+    if (imm < 0x1000u) {
+        imm12 = imm;
+    } else if ((imm & 0xFFFu) == 0 && (imm >> 12) < 0x1000u) {
+        imm12 = imm >> 12;
+        shift = 1;
+    } else {
+        return 0;
+    }
+
+    return 0x91000000u
+         | (shift << 22)
+         | ((imm12 & 0xFFFu) << 10)
+         | ((UINT32)(rn & 0x1Fu) << 5)
+         | (rd & 0x1Fu);
+}
+
+static INT32 patch_fixed_adrl_target(CHAR8* buffer, INT32 size, INT32 adrp_off, UINT64 load_base,
+                                     INT64 expected_target, INT64 new_target, const CHAR8* tag) {
+    if (adrp_off < 0 || adrp_off + 8 > size) {
+        Print_patcher("%s patch offset out of range\n", tag);
+        return -1;
+    }
+
+    DecodedInst d0 = decode_at(buffer, adrp_off);
+    DecodedInst d1 = decode_at(buffer, adrp_off + 4);
+    if (d0.type != INST_ADRP || d1.type != INST_ADD_X_IMM || d1.rn != d0.rt) {
+        Print_patcher("%s patch site is not ADRP+ADD\n", tag);
+        return -1;
+    }
+
+    INT64 current_target = calc_adrl_file_offset(buffer, adrp_off, load_base);
+    if (current_target == new_target) {
+        Print_patcher("%s already patched -> file:0x%llX\n",
+                      tag, (unsigned long long)new_target);
+        return 0;
+    }
+
+    if (current_target != expected_target) {
+        Print_patcher("%s expected file:0x%llX, found file:0x%llX\n",
+                      tag,
+                      (unsigned long long)expected_target,
+                      (unsigned long long)current_target);
+        return -1;
+    }
+
+    UINT32 new_adrp = encode_adrp_target(d0.rt, adrp_off, load_base, (UINT64)new_target);
+    UINT32 new_add  = encode_add_x_imm_target(d1.rt, d1.rn, (UINT32)(new_target & 0xFFF));
+    if (new_add == 0) {
+        Print_patcher("%s new ADD immediate is out of range\n", tag);
+        return -1;
+    }
+
+    Print_patcher("%s patch: file:0x%llX -> file:0x%llX\n",
+                  tag,
+                  (unsigned long long)current_target,
+                  (unsigned long long)new_target);
+
+    write_instr(buffer, adrp_off, new_adrp);
+    write_instr(buffer, adrp_off + 4, new_add);
+    return 0;
+}
+
+static INT32 patch_first_adrl_by_string(CHAR8* buffer, INT32 size, UINT64 load_base,
+                                        const CHAR8* old_str, INT64 new_target,
+                                        const CHAR8* tag) {
+    for (INT32 i = 0; i <= size - 8; i += 4) {
+        DecodedInst d0 = decode_at(buffer, i);
+        DecodedInst d1 = decode_at(buffer, i + 4);
+
+        if (d0.type != INST_ADRP || d1.type != INST_ADD_X_IMM) continue;
+        if (d1.rn != d0.rt) continue;
+
+        INT64 current_target = calc_adrl_file_offset(buffer, i, load_base);
+        if (current_target == new_target) {
+            Print_patcher("%s already patched -> file:0x%llX\n",
+                          tag, (unsigned long long)new_target);
+            return 0;
+        }
+
+        if (!str_at(buffer, size, current_target, old_str)) continue;
+
+        UINT32 new_adrp = encode_adrp_target(d0.rt, i, load_base, (UINT64)new_target);
+        UINT32 new_add  = encode_add_x_imm_target(d1.rt, d1.rn, (UINT32)(new_target & 0xFFF));
+        if (new_add == 0) {
+            Print_patcher("%s new ADD immediate is out of range\n", tag);
+            return -1;
+        }
+
+        Print_patcher("%s patch: file:0x%llX \"%s\" -> file:0x%llX\n",
+                      tag,
+                      (unsigned long long)current_target,
+                      old_str,
+                      (unsigned long long)new_target);
+
+        write_instr(buffer, i, new_adrp);
+        write_instr(buffer, i + 4, new_add);
+        return 0;
+    }
+
+    Print_patcher("%s source string \"%s\" not found\n", tag, old_str);
+    return -1;
+}
+
+INT32 patch_hwcountry_global(CHAR8* buffer, INT32 size, UINT64 load_base) {
+    const CHAR8 hwcountry_value[] = "GLOBAL";
+    const CHAR8 hwcountry_line[]  = "HwCountry: GLOBAL";
+    const INT32 slack_start = 0x7F000;
+    const INT32 slack_end   = 0x80000;
+    INT32 cursor = find_zero_run(buffer, size, slack_start, slack_end,
+                                 (INT32)(strlen(hwcountry_value) + strlen(hwcountry_line) + 2));
+    if (cursor < 0) {
+        Print_patcher("HwCountry patch: no slack space found in 0x%X-0x%X\n",
+                      slack_start, slack_end);
+        return -1;
+    }
+    if (cursor > 0 && buffer[cursor - 1] != 0) cursor++;
+
+    INT64 value_off = ensure_cstring(buffer, size, &cursor, slack_end, hwcountry_value);
+    INT64 line_off  = ensure_cstring(buffer, size, &cursor, slack_end, hwcountry_line);
+    if (value_off < 0 || line_off < 0) {
+        Print_patcher("HwCountry patch: failed to place replacement strings\n");
+        return -1;
+    }
+
+    if (patch_fixed_adrl_target(buffer, size, 0x1DC38, load_base, 0x106D60, value_off,
+                                "HwCountry getvar") != 0) {
+        return -1;
+    }
+
+    if (patch_first_adrl_by_string(buffer, size, load_base, "HwCountry: %a", line_off,
+                                   "HwCountry display") != 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
 INT32 patch_adrl_unlocked_to_locked(CHAR8* buffer, INT32 size, UINT64 load_base) {
     if (size < 24) return 0;
     INT32 patched = 0;
@@ -527,6 +723,13 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
     #ifndef DISABLE_PATCH_1
     if (patch_abl_gbl(data, size) != 0)
         Print_patcher("Warning: Failed to patch ABL GBL\n");
+    #endif
+    #ifndef DISABLE_PATCH_6
+    if (patch_hwcountry_global(data, size, 0) != 0) {
+        Print_patcher("Error: Failed to patch HwCountry -> GLOBAL\n");
+        free(data);
+        return FALSE;
+    }
     #endif
     #ifndef DISABLE_PATCH_2
     if (patch_adrl_unlocked_to_locked(data, size, 0) == 0){
