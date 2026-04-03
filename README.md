@@ -1,7 +1,7 @@
 # build with CLAND/LLD version 20
 # GBL Root Canoe
 
-## This Proj is not used to hack inside games or commit a crime, Use at ur OWN RISK ! 
+## This Project is NOT Used to Hack Inside Games or Commit a Crime, use at your OWN RISK ! 
 
 
 ## What this project is
@@ -21,7 +21,7 @@
 - Redmagic 11 series
 - Nubia Z80 ultra
 
-*** None Of the Scamsung Phones r influenced ***
+*** None of the Samsung Phones are influenced ***
 
 ## Core directories
 
