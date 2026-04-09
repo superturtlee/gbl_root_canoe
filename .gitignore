@@ -24,6 +24,8 @@ ENV/
 *.img
 *.efi
 extracted/
+images/
+!images/PUT_ABL_IMG_HERE
 
 # VS Code
 .vscode/
