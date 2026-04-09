@@ -568,6 +568,121 @@ BOOLEAN patch_string_jump(CHAR8* buffer, INT32 size) {
     return patched;
 }
 
+/*
+ * Patch 6: Force androidboot.veritymode=logging
+ *
+ * Two code paths set androidboot.veritymode in the ABL:
+ *   Path A (VerifyBootAndAppendCmdline): ADRP+ADD loads "enforcing" string,
+ *          CSEL picks between "eio" and "enforcing" based on managed mode flag.
+ *   Path B (verity setup function): reads from a pointer table indexed by
+ *          DeviceInfo.verity_mode — entry 0="logging", entry 1="enforcing".
+ *
+ * We patch BOTH paths:
+ *   1) Scan for ADRP+ADD pairs where one resolves to "enforcing" near one
+ *      resolving to "androidboot.veritymode", rewrite to point to "logging".
+ *   2) Find the pointer table and overwrite the "enforcing" entry.
+ */
+INT32 patch_abl_verity_logging(CHAR8* buffer, INT32 size, UINT64 load_base) {
+    INT32 patched = 0;
+
+    /* --- Part 1: Patch ADRP+ADD code references to "enforcing" --- */
+    for (INT32 i = 0; i <= size - 8; i += 4) {
+        DecodedInst a0 = decode_at(buffer, i);
+        DecodedInst a1 = decode_at(buffer, i + 4);
+        if (a0.type != INST_ADRP || a1.type != INST_ADD_X_IMM) continue;
+        if (a1.rt != a0.rt || a1.rn != a0.rt) continue;
+
+        INT64 off = calc_adrl_file_offset(buffer, i, load_base);
+        if (!str_at(buffer, size, off, "enforcing")) continue;
+
+        /* Find a nearby "logging" string to get its address */
+        INT64 off_log = -1;
+        for (INT32 s = 0; s < size - 7; ++s) {
+            if (buffer[s] == 'l' && memcmp_patcher(buffer + s, "logging", 7) == 0 &&
+                (s == 0 || buffer[s - 1] == '\0')) {
+                off_log = s;
+                break;
+            }
+        }
+        if (off_log < 0) {
+            Print_patcher("Verity ADRP: found 'enforcing' at 0x%X but no 'logging' string\n", i);
+            continue;
+        }
+
+        /* Verify this "enforcing" is near a "androidboot.veritymode" reference
+         * (within 128 instructions / 512 bytes) to avoid false positives */
+        BOOLEAN near_verity_key = FALSE;
+        INT32 scan_start = (i > 512) ? i - 512 : 0;
+        INT32 scan_end = (i + 512 < size - 8) ? i + 512 : size - 8;
+        for (INT32 j = scan_start; j <= scan_end; j += 4) {
+            DecodedInst t0 = decode_at(buffer, j);
+            DecodedInst t1 = decode_at(buffer, j + 4);
+            if (t0.type != INST_ADRP || t1.type != INST_ADD_X_IMM) continue;
+            if (t1.rt != t0.rt || t1.rn != t0.rt) continue;
+            INT64 toff = calc_adrl_file_offset(buffer, j, load_base);
+            if (str_at(buffer, size, toff, "androidboot.veritymode")) {
+                near_verity_key = TRUE;
+                break;
+            }
+        }
+        if (!near_verity_key) continue;
+
+        UINT64 log_va = load_base + (UINT64)off_log;
+        UINT64 pc = load_base + (UINT64)i;
+        UINT64 page_pc = pc & ~0xFFFull;
+        INT64 page_delta = (INT64)((log_va & ~0xFFFull) - page_pc);
+        UINT32 lo12 = (UINT32)(log_va & 0xFFF);
+
+        UINT32 immlo = (UINT32)((page_delta >> 12) & 0x3);
+        UINT32 immhi = (UINT32)((page_delta >> 14) & 0x7FFFF);
+        UINT32 new_adrp = 0x90000000 | (immlo << 29) | (immhi << 5) | a0.rt;
+        UINT32 new_add = 0x91000000 | (lo12 << 10) | (a1.rt << 5) | a1.rt;
+
+        Print_patcher("Verity ADRP patch at 0x%X: \"enforcing\" -> \"logging\"\n", i);
+        Print_patcher("  ADRP %08X -> %08X, ADD %08X -> %08X\n",
+                       a0.raw, new_adrp, a1.raw, new_add);
+
+        write_instr(buffer, i, new_adrp);
+        write_instr(buffer, i + 4, new_add);
+        patched++;
+    }
+
+    Print_patcher("Verity ADRP: patched %d code reference(s)\n", patched);
+
+    /* --- Part 2: Patch the pointer table --- */
+    INT64 off_log = -1, off_enf = -1;
+    for (INT32 s = 0; s < size - 9; ++s) {
+        if (buffer[s] == 'l' && memcmp_patcher(buffer + s, "logging", 7) == 0 &&
+            (s == 0 || buffer[s - 1] == '\0'))
+            off_log = s;
+        if (buffer[s] == 'e' && memcmp_patcher(buffer + s, "enforcing", 9) == 0 &&
+            (s == 0 || buffer[s - 1] == '\0'))
+            off_enf = s;
+    }
+
+    if (off_log >= 0 && off_enf >= 0) {
+        UINT64 val_log = (UINT64)off_log;
+        UINT64 val_enf = (UINT64)off_enf;
+        for (INT32 i = 0; i <= size - 32; i += 8) {
+            UINT64 v;
+            memcpy_patcher(&v, buffer + i, 8);
+            if (v == val_log) {
+                UINT64 v2;
+                memcpy_patcher(&v2, buffer + i + 16, 8);
+                if (v2 == val_enf) {
+                    Print_patcher("Verity table patch at 0x%X: [0x%llX] \"enforcing\" -> \"logging\"\n",
+                                   i + 16, (unsigned long long)val_enf);
+                    memcpy_patcher(buffer + i + 16, &val_log, 8);
+                    patched++;
+                    break;
+                }
+            }
+        }
+    }
+
+    return (patched > 0) ? 0 : -1;
+}
+
 BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
     #ifndef DISABLE_PATCH_1
     if (patch_abl_gbl(data, size) != 0)
@@ -605,5 +720,11 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
         Print_patcher("Warning: Failed to patch LDRB->STRB chain for W%d\n",
                (int)lock_register_num);
     }
+
+    #ifndef DISABLE_PATCH_6
+    if (patch_abl_verity_logging(data, size, 0) != 0)
+        Print_patcher("Warning: Failed to patch verity mode to logging\n");
+    #endif
+
     return 1;
 }
