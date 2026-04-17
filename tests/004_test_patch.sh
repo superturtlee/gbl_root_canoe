@@ -6,7 +6,7 @@ rm -rf ./extracted || true
 gcc -O2 -o ../tools/extractfv ../tools/extractfv.c -llzma
 ../tools/extractfv 001_myron_abl.elf -o ./extracted >> /dev/null 2>&1
 # Run the patching script with disabled Patch 2-5
-gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7
+gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7 -D DISABLE_PATCH_8
 #run the patching tool
 mkdir ./patch_output || true
 ./patch_abl ./extracted/LinuxLoader.efi ./patch_output/patch1.efi >> /dev/null 2>&1
@@ -24,7 +24,7 @@ else
     exit 1
 fi
 #enable Patch 2 and run the patching tool again
-gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7
+gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7 -D DISABLE_PATCH_8
 ./patch_abl ./extracted/LinuxLoader.efi ./patch_output/patch2.efi >> /dev/null 2>&1
 EXPECTED_HASH="469c873732971372f9e4bf6cea91b17e"
 ACTUAL_HASH=$(md5sum ./patch_output/patch2.efi | awk '{print $1}')
@@ -40,7 +40,7 @@ else
     exit 1
 fi
 #enable Patch 3 and run the patching tool again
-gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7
+gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7 -D DISABLE_PATCH_8
 ./patch_abl ./extracted/LinuxLoader.efi ./patch_output/patch3.efi >> /dev/null 2>&1
 EXPECTED_HASH="c59d105bae89e5c55cfe43ae72ea950a"
 ACTUAL_HASH=$(md5sum ./patch_output/patch3.efi | awk '{print $1}')
@@ -56,7 +56,7 @@ else
     exit 1
 fi
 #enable Patch 4 and run the patching tool again
-gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7
+gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7 -D DISABLE_PATCH_8
 ./patch_abl ./extracted/LinuxLoader.efi ./patch_output/patch4.efi >> /dev/null 2>&1
 EXPECTED_HASH="d91a0611d7a23a8809b95bb7764fc901"
 ACTUAL_HASH=$(md5sum ./patch_output/patch4.efi | awk '{print $1}')
@@ -72,7 +72,7 @@ else
     exit 1
 fi
 #enable Patch 5 and run the patching tool again
-gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7
+gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7 -D DISABLE_PATCH_8
 ./patch_abl ./extracted/LinuxLoader.efi ./patch_output/patch5.efi >> /dev/null 2>&1
 #check sum of the final patched file 1-5
 EXPECTED_HASH="9a18127e8bfd10e18a53911298f000cb"
@@ -89,7 +89,7 @@ else
     exit 1
 fi
 #enable Patch 6 and run the patching tool again
-gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_7
+gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_7 -D DISABLE_PATCH_8
 ./patch_abl ./extracted/LinuxLoader.efi ./patch_output/patch6.efi >> /dev/null 2>&1
 EXPECTED_HASH="53ad97eac4f8ff44ed707ca97830192a"
 ACTUAL_HASH=$(md5sum ./patch_output/patch6.efi | awk '{print $1}')
@@ -109,7 +109,7 @@ fi
 rm -rf ./extracted
 ../tools/extractfv 002_infiniti_abl.elf -o ./extracted >> /dev/null 2>&1
 #enable Patch 7 and run the patching tool again
-gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6
+gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6 -D DISABLE_PATCH_8
 ./patch_abl ./extracted/LinuxLoader.efi ./patch_output/patch7.efi >> /dev/null 2>&1
 EXPECTED_HASH="8f8e36882ff86042dbc6875948cdd9ac"
 ACTUAL_HASH=$(md5sum ./patch_output/patch7.efi | awk '{print $1}')
@@ -117,6 +117,21 @@ if [ "$EXPECTED_HASH" = "$ACTUAL_HASH" ]; then
     echo "Test passed: Final patched7 file matches expected hash."
 else
     echo "Test failed: Final patched7 file hash does not match expected."
+    echo "Expected: $EXPECTED_HASH"
+    echo "Actual:   $ACTUAL_HASH"
+    rm -rf ./extracted
+    rm -rf ./patch_output
+    rm ./patch_abl
+    exit 1
+fi
+gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7
+./patch_abl ./extracted/LinuxLoader.efi ./patch_output/patch8.efi >> /dev/null 2>&1
+EXPECTED_HASH="74b5eae364d2e11027d8e66ce5276942"
+ACTUAL_HASH=$(md5sum ./patch_output/patch8.efi | awk '{print $1}')
+if [ "$EXPECTED_HASH" = "$ACTUAL_HASH" ]; then
+    echo "Test passed: Final patched8 file matches expected hash."
+else
+    echo "Test failed: Final patched8 file hash does not match expected."
     echo "Expected: $EXPECTED_HASH"
     echo "Actual:   $ACTUAL_HASH"
     rm -rf ./extracted
