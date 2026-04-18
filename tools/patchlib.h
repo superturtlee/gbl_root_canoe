@@ -914,7 +914,7 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
 
     #ifndef DISABLE_PATCH_7
     if (patch_orange_state_screen(data, size) == 0)
-        Print_patcher("Warning: Failed to patch orange state screen\n");
+        Print_patcher("Warning: Failed to patch OnePlus/OPPO/Realme orange state screen\n");
     #endif
 
     return 1;
