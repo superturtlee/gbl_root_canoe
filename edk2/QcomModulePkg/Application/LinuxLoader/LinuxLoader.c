@@ -878,7 +878,9 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
 {
 
   EFI_STATUS Status;
+#ifndef TEST_ADAPTER
   UINT32 IsAllowUnlock = FALSE;
+#endif
 
    /* Update stack check guard with random value for better security */
   /* SilentMode Boot */
@@ -928,18 +930,20 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
   /*Check for multislot boot support*/
 #ifndef TEST_ADAPTER
     Status = ReadAllowUnlockValue (&IsAllowUnlock);
+    if (Status != EFI_SUCCESS) {
+      DEBUG ((EFI_D_ERROR, "Unable to read allow unlock value: %r\n", Status));
+    } else if (!IsAllowUnlock) {
+      DEBUG ((EFI_D_WARN, "Allow unlock is disabled; keeping superfastboot key window available\n"));
+    }
 #else
-    IsAllowUnlock = TRUE; // For test adapter, directly set allow unlock to true to enter fastboot
     Status = EFI_SUCCESS;
 #endif
-  if (Status != EFI_SUCCESS|| !IsAllowUnlock) {
-    DEBUG ((EFI_D_ERROR, "Unable to read allow unlock value: %r\n", Status));
-#ifndef TEST_ADAPTER
-    LoadIntegratedEfi();
- #endif
-    return EFI_SUCCESS;
-  }
 
+  /* Keep the superfastboot key window reachable even when FRP/OEM unlock
+   * state is disabled or unreadable. Normal builds still fall through to the
+   * integrated ABL when no key is pressed; TEST_ADAPTER remains the dedicated
+   * superfastboot-only build with no normal-boot fallback.
+   */
   //wait for 5 sec for key press
   //Print(L"Press Volume Down key to enter Fastboot mode, waiting for 3 seconds into Normal mode...\n");
   //Print(L"Press Volume Up key to enter Normal mode\n");
