@@ -640,6 +640,13 @@ INT32 patch_adrl_unlocked_to_locked_verify(CHAR8* buffer, INT32 size, UINT64 loa
     }
     return patched;
 }
+/*
+ * Patch 6: bypass jumps into lock-state rejection handlers.
+ *
+ * Some vendor ABLs gate flash/erase paths by branching into code that loads a
+ * string containing "is not allowed in Lock State". NOP the branch so control
+ * falls through the normal path instead.
+ */
 CHAR8 keyword []="is not allowed in Lock State";
 BOOLEAN check_sub_string(CHAR8* str,CHAR8* keyword){
     INT32 len = 0;
@@ -679,7 +686,7 @@ BOOLEAN patch_string_jump(CHAR8* buffer, INT32 size) {
 }
 
 /*
- * Patch 6: Force androidboot.veritymode=logging
+ * Patch 9: Force androidboot.veritymode=logging
  *
  * Two code paths set androidboot.veritymode in the ABL:
  *   Path A (VerifyBootAndAppendCmdline): ADRP+ADD loads "enforcing" string,
@@ -884,8 +891,8 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
     }
     #endif
     #ifndef DISABLE_PATCH_6
-    if (patch_string_jump(data, size) != 0)
-    Print_patcher("Warning: Failed to patch string jump\n");
+    if (!patch_string_jump(data, size))
+        Print_patcher("Warning: Failed to patch lockstate jump\n");
     #endif
     INT32 offset = -1;
     INT8 lock_register_num = -1;
@@ -907,7 +914,7 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
                (int)lock_register_num);
     }
 
-    #ifndef DISABLE_PATCH_6
+    #ifndef DISABLE_PATCH_9
     if (patch_abl_verity_logging(data, size, 0) != 0)
         Print_patcher("Warning: Failed to patch verity mode to logging\n");
     #endif
