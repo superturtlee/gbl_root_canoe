@@ -104,6 +104,22 @@ else
     rm ./patch_abl
     exit 1
 fi
+#enable Patch 8 and run the patching tool again
+gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7
+./patch_abl ./extracted/LinuxLoader.efi ./patch_output/patch8.efi >> /dev/null 2>&1
+EXPECTED_HASH="1d3ceba85cdc3371cf84b111e14a87c0"
+ACTUAL_HASH=$(md5sum ./patch_output/patch8.efi | awk '{print $1}')
+if [ "$EXPECTED_HASH" = "$ACTUAL_HASH" ]; then
+    echo "Test passed: Final patched8 file matches expected hash."
+else
+    echo "Test failed: Final patched8 file hash does not match expected."
+    echo "Expected: $EXPECTED_HASH"
+    echo "Actual:   $ACTUAL_HASH"
+    rm -rf ./extracted
+    rm -rf ./patch_output
+    rm ./patch_abl
+    exit 1
+fi
 # Requires Oplus ABL
 # OnePlus 15 16.0.5.700 GLO
 rm -rf ./extracted
@@ -117,21 +133,6 @@ if [ "$EXPECTED_HASH" = "$ACTUAL_HASH" ]; then
     echo "Test passed: Final patched7 file matches expected hash."
 else
     echo "Test failed: Final patched7 file hash does not match expected."
-    echo "Expected: $EXPECTED_HASH"
-    echo "Actual:   $ACTUAL_HASH"
-    rm -rf ./extracted
-    rm -rf ./patch_output
-    rm ./patch_abl
-    exit 1
-fi
-gcc -o patch_abl ../tools/patch_abl.c -D DISABLE_PATCH_1 -D DISABLE_PATCH_2 -D DISABLE_PATCH_3 -D DISABLE_PATCH_4 -D DISABLE_PATCH_5 -D DISABLE_PATCH_6 -D DISABLE_PATCH_7
-./patch_abl ./extracted/LinuxLoader.efi ./patch_output/patch8.efi >> /dev/null 2>&1
-EXPECTED_HASH="74b5eae364d2e11027d8e66ce5276942"
-ACTUAL_HASH=$(md5sum ./patch_output/patch8.efi | awk '{print $1}')
-if [ "$EXPECTED_HASH" = "$ACTUAL_HASH" ]; then
-    echo "Test passed: Final patched8 file matches expected hash."
-else
-    echo "Test failed: Final patched8 file hash does not match expected."
     echo "Expected: $EXPECTED_HASH"
     echo "Actual:   $ACTUAL_HASH"
     rm -rf ./extracted

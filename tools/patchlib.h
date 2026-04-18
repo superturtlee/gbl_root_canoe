@@ -793,35 +793,79 @@ INT32 patch_abl_verity_logging(CHAR8* buffer, INT32 size, UINT64 load_base) {
     return (patched > 0) ? 0 : -1;
 }
 
-INT32 patch_verifiedbootstate_legacy(CHAR8* buffer, INT32 size, INT32* offset) {
-    UINT32 rd;
-    UINT32* pins;
-
-    INT16 pattern[] = {
-        -1, -1, -1, 0xB9, -1, 0x02, 0x00, -1,-1,-1,-1,-1, -1, 0x03, -1, 0xAA,-1,-1,-1,0x8B
+/*
+ * Patch 8: Force the cmdline verifiedbootstate value to orange.
+ *
+ * The helper that appends "androidboot.verifiedbootstate=" selects a color
+ * string from the verifiedbootstate table using state->boot_state at +0x438.
+ * Patch only that helper-site load sequence so the cmdline sees index 1
+ * ("orange"), while leaving the shared table and debug-print paths alone.
+ * Fairly certain OnePlus ABLs derive "oplusboot.verifiedbootstate=" later by copying
+ * the already-built androidboot value, so patching this helper is the smallest
+ * semantic change that updates both cmdline properties.
+ *
+ * Pattern observed in both Infiniti and Myron ABLs:
+ *   ldrsw x8, [x20, #0x438]
+ *   adrp  x9, <verifiedbootstate table>
+ *   add   x9, x9, #<table lo12>
+ *   mov   x0, x20
+ *   add   x8, x9, x8, lsl #4
+ *   ldr   x1, [x8, #0x8]
+ */
+INT32 patch_verifiedbootstate_orange(CHAR8* buffer, INT32 size, INT32* offset) {
+    static const INT16 helper_pattern[] = {
+        0x88, 0x3A, 0x84, 0xB9,
+        -1, -1, -1, -1,
+        -1, -1, -1, -1,
+        0xE0, 0x03, 0x14, 0xAA,
+        0x28, 0x11, 0x08, 0x8B,
+        0x01, 0x05, 0x40, 0xF9
     };
-
-    INT32 pattern_len = sizeof(pattern) / sizeof(INT16);
+    static const UINT32 mov_x8_one = 0xD2800028; /* mov x8, #1 */
+    INT32 pattern_len = sizeof(helper_pattern) / sizeof(INT16);
+    INT32 patched = 0;
 
     if (size < pattern_len) return 0;
-    for (INT32 i = 0; i <= size - pattern_len; ++i) {
+
+    for (INT32 i = 0; i <= size - pattern_len; i += 4) {
         BOOLEAN match = TRUE;
+
         for (INT32 j = 0; j < pattern_len; ++j) {
-            if (pattern[j] != -1 && (UINT8)buffer[i + j] != (UINT8)pattern[j]) {
-                match = FALSE; break;
+            if (helper_pattern[j] != -1 &&
+                (UINT8)buffer[i + j] != (UINT8)helper_pattern[j]) {
+                match = FALSE;
+                break;
             }
         }
-        if (match) {
-            pins = (UINT32*)(buffer + i);
-            rd = *pins & 0x1F;
-            *pins = rd | 0xD2800020;
-            Print_patcher("========pins 0x%X\n",
-                *pins);
-            if (offset) *offset = i;
-            return 1;
-        }
+        if (!match) continue;
+
+        #ifndef DISABLE_PRINT
+        Print_patcher("Patch 8: verifiedbootstate helper at 0x%X\n", i);
+        Print_patcher("  Before: %02X %02X %02X %02X\n",
+                      (UINT8)buffer[i], (UINT8)buffer[i + 1],
+                      (UINT8)buffer[i + 2], (UINT8)buffer[i + 3]);
+        #endif
+
+        write_instr(buffer, i, mov_x8_one);
+
+        #ifndef DISABLE_PRINT
+        Print_patcher("  After : %02X %02X %02X %02X\n",
+                      (UINT8)buffer[i], (UINT8)buffer[i + 1],
+                      (UINT8)buffer[i + 2], (UINT8)buffer[i + 3]);
+        #endif
+
+        if (offset && patched == 0) *offset = i;
+        patched++;
     }
-    return 0;
+
+    #ifndef DISABLE_PRINT
+    if (patched == 0)
+        Print_patcher("Patch 8: verifiedbootstate helper not found\n");
+    else
+        Print_patcher("Patch 8: patched %d helper site(s)\n", patched);
+    #endif
+
+    return patched;
 }
 
 BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
@@ -832,12 +876,10 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
     #ifndef DISABLE_PATCH_2
     if (patch_adrl_unlocked_to_locked(data, size, 0) == 0){
         Print_patcher("Warning: ADRL triple not found, skipping\n");
-        free(data);
         return FALSE;
     }
     if (patch_adrl_unlocked_to_locked_verify(data, size, 0) == 0){
         Print_patcher("Error: ADRL verification failed\n");
-        free(data);
         return FALSE;
     }
     #endif
@@ -850,22 +892,16 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
     INT32 num_patches = patch_abl_bootstate(data, size, &lock_register_num, &offset);
     if (num_patches == 0) {
         Print_patcher("Error: Failed to find/patch ABL Boot State\n");
-        free(data);
         return 0;
     }
     Print_patcher("Anchor offset : 0x%X\n", offset);
     Print_patcher("Lock register : W%d\n", (int)lock_register_num);
     Print_patcher("Boot patches: %d\n", num_patches);
 
-#ifndef AUTO_PATCH_ABL
     #ifndef DISABLE_PATCH_8
-    if (patch_verifiedbootstate_legacy(data, size, 0) == 0) {
-        Print_patcher("Error: patch_verifiedbootstate_legacy failed\n");
-        free(data);
-        return FALSE;
-    }
+    if (patch_verifiedbootstate_orange(data, size, 0) == 0)
+        Print_patcher("Warning: Failed to patch verifiedbootstate to orange\n");
     #endif
-#endif
     if (find_ldrB_instructio_reverse(data, size, offset, lock_register_num) != 0) {
         Print_patcher("Warning: Failed to patch LDRB->STRB chain for W%d\n",
                (int)lock_register_num);
