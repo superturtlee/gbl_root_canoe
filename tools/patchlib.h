@@ -425,6 +425,62 @@ static INT64 calc_adrl_file_offset(const CHAR8* buffer, INT32 adrp_off, UINT64 l
     return (INT64)(target_va - load_base);
 }
 
+/*
+ * Patch 7: Skip orange state screen, warning text, and 5-second boot delay.
+ *
+ * LinuxLoaderEntry contains:
+ *   if (DAT_000b13c5 != 0) {          // unlocked flag
+ *       FUN_000028b0(..., "Your device has been unlocked...", ...);
+ *       FUN_000028b0(..., "Your device will boot in 5 seconds", ...);
+ *       DAT_00081f0c = 3;
+ *       DAT_00081f18 = uVar11;
+ *       FUN_00031560();               // ShowDeviceStatetoscreen
+ *   }
+ *
+ * The guard is: CBZ Wt, +#0x8c  — skips the block when locked (Wt==0).
+ * We turn it into B +#0x8c — unconditionally skip regardless of lock state.
+ *
+ * Anchor: the unique 8-byte sequence ending with the CBZ:
+ *   36 31 88 1A  (AND/CSEL before the branch)
+ *   ?? 04 00 34  (CBZ Wt, +#0x8c — Rt field varies, upper 3 bytes fixed)
+ *
+ * Patch: overwrite the CBZ with B +#0x8c (0x14000023, LE: 23 00 00 14).
+ */
+INT32 patch_orange_state_screen(CHAR8* buffer, INT32 size) {
+    /* Fixed bytes: preceding instruction + CBZ upper 3 bytes (imm19 + opcode) */
+    static const UINT8 anchor[] = { 0x36, 0x31, 0x88, 0x1A };
+    static const UINT8 cbz_hi[] = { 0x04, 0x00, 0x34 };          /* bytes [1..3] of CBZ */
+    /* B +#0x8c = 0x14000023 */
+    static const UINT8 b_patch[] = { 0x23, 0x00, 0x00, 0x14 };
+
+    INT32 patched = 0;
+    for (INT32 i = 0; i <= size - 8; i += 4) {
+        if (memcmp_patcher(buffer + i,     anchor, 4) != 0) continue;
+        if (memcmp_patcher(buffer + i + 5, cbz_hi, 3) != 0) continue;
+        #ifndef DISABLE_PRINT
+        Print_patcher("Patch 7: orange state CBZ at 0x%X  W%d -> B +#0x8c\n",
+                      i + 4, (int)((UINT8)buffer[i + 4] & 0x1F));
+        Print_patcher("  Before: %02X %02X %02X %02X\n",
+                      (UINT8)buffer[i+4], (UINT8)buffer[i+5],
+                      (UINT8)buffer[i+6], (UINT8)buffer[i+7]);
+        #endif
+        memcpy_patcher(buffer + i + 4, b_patch, 4);
+        #ifndef DISABLE_PRINT
+        Print_patcher("  After : %02X %02X %02X %02X\n",
+                      (UINT8)buffer[i+4], (UINT8)buffer[i+5],
+                      (UINT8)buffer[i+6], (UINT8)buffer[i+7]);
+        #endif
+        patched++;
+    }
+    #ifndef DISABLE_PRINT
+    if (patched == 0)
+        Print_patcher("Patch 7: orange state CBZ not found\n");
+    else
+        Print_patcher("Patch 7: applied %d location(s)\n", patched);
+    #endif
+    return patched;
+}
+
 INT32 patch_adrl_unlocked_to_locked(CHAR8* buffer, INT32 size, UINT64 load_base) {
     if (size < 24) return 0;
     INT32 patched = 0;
@@ -724,6 +780,11 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
     #ifndef DISABLE_PATCH_6
     if (patch_abl_verity_logging(data, size, 0) != 0)
         Print_patcher("Warning: Failed to patch verity mode to logging\n");
+    #endif
+
+    #ifndef DISABLE_PATCH_7
+    if (patch_orange_state_screen(data, size) == 0)
+        Print_patcher("Warning: Failed to patch orange state screen\n");
     #endif
 
     return 1;
