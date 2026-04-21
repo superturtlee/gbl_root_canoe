@@ -266,6 +266,69 @@ WaitForVolumeDownKey (IN UINT32 TimeoutMs)
 
   return KeyDetected;
 }
+
+STATIC EFI_STATUS
+MountLogFsForUefiLogTest (VOID)
+{
+  EFI_STATUS                       Status;
+  PartiSelectFilter                HandleFilter;
+  HandleInfo                       HandleInfoList[1];
+  UINT32                           MaxHandles;
+  UINT32                           BlkIoAttrib;
+  EFI_HANDLE                      *Handle;
+  EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Fs;
+  EFI_FILE_PROTOCOL               *Root;
+
+  ZeroMem (&HandleFilter, sizeof (HandleFilter));
+  ZeroMem (HandleInfoList, sizeof (HandleInfoList));
+
+  BlkIoAttrib = BLK_IO_SEL_PARTITIONED_GPT |
+                BLK_IO_SEL_PARTITIONED_MBR |
+                BLK_IO_SEL_MEDIA_TYPE_NON_REMOVABLE |
+                BLK_IO_SEL_MATCH_PARTITION_LABEL;
+  HandleFilter.PartitionLabel = L"logfs";
+  MaxHandles = ARRAY_SIZE (HandleInfoList);
+
+  Status = GetBlkIOHandles (BlkIoAttrib, &HandleFilter,
+                            HandleInfoList, &MaxHandles);
+  if (EFI_ERROR (Status) || MaxHandles != 1) {
+    Print (L"LOGFS test: partition lookup failed: %r handles=%u\n",
+           Status, MaxHandles);
+    return EFI_NOT_FOUND;
+  }
+
+  Handle = HandleInfoList[0].Handle;
+  if (Handle == NULL) {
+    Print (L"LOGFS test: partition handle missing\n");
+    return EFI_NOT_FOUND;
+  }
+
+  Print (L"LOGFS test: connecting controller\n");
+  Status = gBS->ConnectController (Handle, NULL, NULL, TRUE);
+  if (EFI_ERROR (Status) && Status != EFI_ALREADY_STARTED) {
+    Print (L"LOGFS test: ConnectController failed: %r\n", Status);
+    return Status;
+  }
+
+  Status = gBS->HandleProtocol (Handle,
+                                &gEfiSimpleFileSystemProtocolGuid,
+                                (VOID **)&Fs);
+  if (EFI_ERROR (Status)) {
+    Print (L"LOGFS test: SimpleFileSystem unavailable: %r\n", Status);
+    return Status;
+  }
+
+  Status = Fs->OpenVolume (Fs, &Root);
+  if (EFI_ERROR (Status)) {
+    Print (L"LOGFS test: OpenVolume failed: %r\n", Status);
+    return Status;
+  }
+
+  Root->Close (Root);
+  Print (L"LOGFS test: mounted successfully\n");
+  return EFI_SUCCESS;
+}
+
 #ifndef TEST_ADAPTER
 STATIC EFI_STATUS
 BootEfiImage (VOID *Data, UINT32 Size)
@@ -927,6 +990,7 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
 
 
   UpdatePartitionEntries ();
+  MountLogFsForUefiLogTest ();
   /*Check for multislot boot support*/
 #ifndef TEST_ADAPTER
     Status = ReadAllowUnlockValue (&IsAllowUnlock);
