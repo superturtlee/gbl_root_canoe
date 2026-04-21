@@ -278,6 +278,19 @@ MountLogFsForUefiLogTest (VOID)
   EFI_HANDLE                      *Handle;
   EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Fs;
   EFI_FILE_PROTOCOL               *Root;
+  EFI_FILE_PROTOCOL               *SourceFile;
+  EFI_FILE_PROTOCOL               *ArchiveFile;
+  EFI_FILE_PROTOCOL               *IndexFile;
+  CHAR16                           ArchivePath[32];
+  UINT32                           Slot;
+  UINT32                           NextSlot;
+  UINTN                            Size;
+  UINT8                            Buffer[4096];
+
+  SourceFile = NULL;
+  ArchiveFile = NULL;
+  IndexFile = NULL;
+  Slot = 0;
 
   ZeroMem (&HandleFilter, sizeof (HandleFilter));
   ZeroMem (HandleInfoList, sizeof (HandleInfoList));
@@ -324,8 +337,128 @@ MountLogFsForUefiLogTest (VOID)
     return Status;
   }
 
-  Root->Close (Root);
   Print (L"LOGFS test: mounted successfully\n");
+
+  Status = Root->Open (Root,
+                       &SourceFile,
+                       L"\\UefiLog1.txt",
+                       EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE,
+                       0);
+  if (Status == EFI_NOT_FOUND) {
+    Print (L"LOGFS test: no previous UefiLog1.txt to archive\n");
+    Root->Close (Root);
+    return EFI_SUCCESS;
+  }
+  if (EFI_ERROR (Status)) {
+    Print (L"LOGFS test: open UefiLog1.txt failed: %r\n", Status);
+    Root->Close (Root);
+    return Status;
+  }
+
+  Status = Root->Open (Root,
+                       &IndexFile,
+                       L"\\UefiLogSaved.idx",
+                       EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE |
+                         EFI_FILE_MODE_CREATE,
+                       0);
+  if (EFI_ERROR (Status)) {
+    Print (L"LOGFS test: open UefiLogSaved.idx failed: %r\n", Status);
+    SourceFile->Close (SourceFile);
+    Root->Close (Root);
+    return Status;
+  }
+
+  Size = sizeof (Slot);
+  Status = IndexFile->Read (IndexFile, &Size, &Slot);
+  if (EFI_ERROR (Status) || Size != sizeof (Slot)) {
+    Slot = 0;
+  }
+  Slot %= 5;
+  NextSlot = (Slot + 1) % 5;
+
+  Status = IndexFile->SetPosition (IndexFile, 0);
+  if (!EFI_ERROR (Status)) {
+    Size = sizeof (NextSlot);
+    Status = IndexFile->Write (IndexFile, &Size, &NextSlot);
+  }
+  if (!EFI_ERROR (Status)) {
+    Status = IndexFile->Flush (IndexFile);
+  }
+  IndexFile->Close (IndexFile);
+  IndexFile = NULL;
+  if (EFI_ERROR (Status)) {
+    Print (L"LOGFS test: update slot index failed: %r\n", Status);
+    SourceFile->Close (SourceFile);
+    Root->Close (Root);
+    return Status;
+  }
+
+  UnicodeSPrint (ArchivePath, sizeof (ArchivePath), L"\\UefiLogSaved%u.txt", Slot);
+
+  Status = Root->Open (Root,
+                       &ArchiveFile,
+                       ArchivePath,
+                       EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE,
+                       0);
+  if (!EFI_ERROR (Status)) {
+    Status = ArchiveFile->Delete (ArchiveFile);
+    ArchiveFile = NULL;
+    if (EFI_ERROR (Status)) {
+      Print (L"LOGFS test: delete old archive failed: %r\n", Status);
+      SourceFile->Close (SourceFile);
+      Root->Close (Root);
+      return Status;
+    }
+  }
+
+  Status = Root->Open (Root,
+                       &ArchiveFile,
+                       ArchivePath,
+                       EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE |
+                         EFI_FILE_MODE_CREATE,
+                       0);
+  if (EFI_ERROR (Status)) {
+    Print (L"LOGFS test: create archive failed: %r\n", Status);
+    SourceFile->Close (SourceFile);
+    Root->Close (Root);
+    return Status;
+  }
+
+  Status = SourceFile->SetPosition (SourceFile, 0);
+  if (!EFI_ERROR (Status)) {
+    Status = ArchiveFile->SetPosition (ArchiveFile, 0);
+  }
+  while (!EFI_ERROR (Status)) {
+    Size = sizeof (Buffer);
+    Status = SourceFile->Read (SourceFile, &Size, Buffer);
+    if (EFI_ERROR (Status) || Size == 0) {
+      break;
+    }
+    Status = ArchiveFile->Write (ArchiveFile, &Size, Buffer);
+  }
+
+  if (Status == EFI_SUCCESS) {
+    Status = ArchiveFile->Flush (ArchiveFile);
+  }
+
+  ArchiveFile->Close (ArchiveFile);
+  if (EFI_ERROR (Status)) {
+    Print (L"LOGFS test: archive copy failed: %r\n", Status);
+    SourceFile->Close (SourceFile);
+    Root->Close (Root);
+    return Status;
+  }
+
+  Print (L"LOGFS test: archived UefiLog1.txt to %s\n", ArchivePath);
+
+  Status = SourceFile->Delete (SourceFile);
+  if (EFI_ERROR (Status)) {
+    Print (L"LOGFS test: delete source UefiLog1.txt failed: %r\n", Status);
+    Root->Close (Root);
+    return Status;
+  }
+
+  Root->Close (Root);
   return EFI_SUCCESS;
 }
 
