@@ -2,6 +2,8 @@ const IMAGE_NAMES = ["abl"];
 
 const state = {
   confirmStep: 0,
+  confirmAction: "flash",
+  needDuplicateWarn: false,
   moduleDir: "",
   scriptPath: "",
   status: null,
@@ -20,6 +22,7 @@ const elements = {
   imageTableBody: document.getElementById("imageTableBody"),
   logOutput: document.getElementById("logOutput"),
   flashButton: document.getElementById("flashButton"),
+  restoreButton: document.getElementById("restoreButton"),
   clearLogButton: document.getElementById("clearLogButton"),
   refreshButton: document.getElementById("refreshButton"),
   confirmModal: document.getElementById("confirmModal"),
@@ -89,7 +92,40 @@ function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function renderTable(currentSlot, targetSlot) {
+function parseBackupTimestamp(filePath) {
+  if (!filePath) return null;
+  const match = String(filePath).match(/_(\d{8})-(\d{6})_[^_]+_backup\.img$/);
+  if (!match) return null;
+
+  const datePart = match[1];
+  const timePart = match[2];
+  const year = Number(datePart.slice(0, 4));
+  const month = Number(datePart.slice(4, 6));
+  const day = Number(datePart.slice(6, 8));
+  const hour = Number(timePart.slice(0, 2));
+  const minute = Number(timePart.slice(2, 4));
+  const second = Number(timePart.slice(4, 6));
+
+  if ([year, month, day, hour, minute, second].some((v) => Number.isNaN(v))) {
+    return null;
+  }
+
+  return new Date(year, month - 1, day, hour, minute, second);
+}
+
+function shouldWarnDuplicateFlash() {
+  const status = state.status || {};
+  if (status.HAS_BACKUP !== "1") return false;
+  if (status.HAS_SAVED === "1") return false;
+
+  const backupTime = parseBackupTimestamp(status.LATEST_BACKUP);
+  if (!backupTime) return false;
+
+  const diffMs = Math.abs(Date.now() - backupTime.getTime());
+  return diffMs < 24 * 60 * 60 * 1000;
+}
+
+function renderTable(status, currentSlot, targetSlot) {
   if (currentSlot === "-" || targetSlot === "-") {
     elements.imageTableBody.innerHTML =
       '<tr><td colspan="4" class="empty-row">等待槽位检测</td></tr>';
@@ -97,14 +133,23 @@ function renderTable(currentSlot, targetSlot) {
   }
 
   elements.imageTableBody.innerHTML = IMAGE_NAMES.map((name) => {
-    const srcPath = `/dev/block/by-name/${name}${currentSlot}`;
+    let srcPath = `/dev/block/by-name/${name}${currentSlot}`;
+    let opText = "分区拷贝";
+    let opClass = "status-pill ok";
+
+    if (name === "abl" && status?.HAS_SAVED === "1" && status?.LATEST_SAVED) {
+      srcPath = status.LATEST_SAVED;
+      opText = "文件刷写(saved)";
+      opClass = "status-pill";
+    }
+
     const dstPath = `/dev/block/by-name/${name}${targetSlot}`;
     return `
       <tr>
         <td>${escapeHtml(name)}</td>
         <td class="caption">${escapeHtml(srcPath)}</td>
         <td>${escapeHtml(dstPath)}</td>
-        <td><span class="status-pill ok">分区拷贝</span></td>
+        <td><span class="${opClass}">${escapeHtml(opText)}</span></td>
       </tr>
     `;
   }).join("");
@@ -143,9 +188,10 @@ function renderStatus(status) {
       : "槽位未知";
 
   elements.flashButton.disabled = running || currentSlot === "-" || targetSlot === "-";
+  elements.restoreButton.disabled = running || currentSlot === "-" || status.HAS_BACKUP !== "1";
   elements.clearLogButton.disabled = running;
 
-  renderTable(currentSlot, targetSlot);
+  renderTable(status, currentSlot, targetSlot);
 }
 
 function refreshStatus() {
@@ -176,34 +222,73 @@ function refreshLog() {
 
 function closeConfirmModal() {
   state.confirmStep = 0;
+  state.confirmAction = "flash";
+  state.needDuplicateWarn = false;
   elements.confirmModal.classList.add("hidden");
   elements.confirmModal.setAttribute("aria-hidden", "true");
   elements.nextConfirmButton.textContent = "继续";
 }
 
-function openConfirmModal() {
+function openConfirmModal(action = "flash") {
+  state.confirmAction = action;
   const targetSlot = state.status?.TARGET_SLOT || "?";
   const withEfisp = Boolean(elements.updateEfispCheckbox?.checked);
-  state.confirmStep = 1;
-  elements.confirmText.textContent = withEfisp
-    ? `第一次确认: 将把当前槽位的 BL 分区拷贝到槽位 ${targetSlot}，并更新 efisp。请确认槽位无误。`
-    : `第一次确认: 将把当前槽位的 BL 分区拷贝到槽位 ${targetSlot}，不更新 efisp。请确认槽位无误。`;
-  elements.nextConfirmButton.textContent = "继续确认";
+  state.needDuplicateWarn = action === "flash" && shouldWarnDuplicateFlash();
+
+  if (state.needDuplicateWarn) {
+    state.confirmStep = 0;
+    elements.confirmText.textContent =
+      "存在一天内的备份文件，请确认是否是重复刷写";
+    elements.nextConfirmButton.textContent = "确认继续";
+  } else {
+    state.confirmStep = 1;
+    elements.nextConfirmButton.textContent = "继续确认";
+  }
+
+  if (action === "restore") {
+    elements.confirmText.textContent =
+      "第一次确认: 将把 /data/adb/abl_backup 中最近的 abl 备份恢复到当前槽位，同时先保存当前槽位 abl。";
+    elements.nextConfirmButton.textContent = "继续确认";
+  } else {
+    if (!state.needDuplicateWarn) {
+      elements.confirmText.textContent = withEfisp
+        ? `第一次确认: 将把当前槽位的 BL 分区拷贝到槽位 ${targetSlot}，并更新 efisp。请确认槽位无误。`
+        : `第一次确认: 将把当前槽位的 BL 分区拷贝到槽位 ${targetSlot}，不更新 efisp。请确认槽位无误。`;
+    }
+  }
+
   elements.confirmModal.classList.remove("hidden");
   elements.confirmModal.setAttribute("aria-hidden", "false");
 }
 
 function handleConfirmProgress() {
+  if (state.confirmAction === "flash" && state.needDuplicateWarn && state.confirmStep === 0) {
+    const targetSlot = state.status?.TARGET_SLOT || "?";
+    const withEfisp = Boolean(elements.updateEfispCheckbox?.checked);
+    state.confirmStep = 1;
+    elements.confirmText.textContent = withEfisp
+      ? `第一次确认: 将把当前槽位的 BL 分区拷贝到槽位 ${targetSlot}，并更新 efisp。请确认槽位无误。`
+      : `第一次确认: 将把当前槽位的 BL 分区拷贝到槽位 ${targetSlot}，不更新 efisp。请确认槽位无误。`;
+    elements.nextConfirmButton.textContent = "继续确认";
+    return;
+  }
+
   if (state.confirmStep === 1) {
     state.confirmStep = 2;
-    elements.confirmText.textContent =
-      "第二次确认: 这是高风险写入操作，错误操作可能导致目标槽位无法启动。确认后将立即开始刷写。";
+    elements.confirmText.textContent = state.confirmAction === "restore"
+      ? "第二次确认: 恢复将覆盖当前槽位 abl，错误镜像可能导致设备无法启动。确认后将立即开始恢复。"
+      : "第二次确认: 这是高风险写入操作，错误操作可能导致目标槽位无法启动。确认后将立即开始刷写。";
     elements.nextConfirmButton.textContent = "确认刷写";
     return;
   }
 
+  const action = state.confirmAction;
   closeConfirmModal();
-  startFlash();
+  if (action === "restore") {
+    startRestore();
+  } else {
+    startFlash();
+  }
 }
 
 function startFlash() {
@@ -245,6 +330,29 @@ function clearLog() {
   manualRefresh();
 }
 
+function startRestore() {
+  try {
+    const output = parseKeyValueOutput(runScript("start-restore"));
+    if (output.ALREADY_RUNNING) {
+      toast("已有任务在运行");
+    } else if (output.STARTED === "1") {
+      toast("恢复任务已启动");
+    } else if (output.FINISHED === "success") {
+      toast("恢复已完成");
+    } else if (output.FINISHED === "warning") {
+      toast("恢复完成（有警告）");
+    } else if (output.FINISHED === "error") {
+      toast("恢复任务已结束（失败）");
+    } else {
+      toast("恢复任务启动失败");
+    }
+  } catch (error) {
+    toast(`恢复启动失败: ${error.message}`);
+  }
+
+  manualRefresh();
+}
+
 function poll() {
   const status = refreshStatus();
   if (status?.RUNNING === "1") refreshLog();
@@ -279,7 +387,8 @@ function init() {
   }
 
   elements.refreshButton.addEventListener("click", manualRefresh);
-  elements.flashButton.addEventListener("click", openConfirmModal);
+  elements.flashButton.addEventListener("click", () => openConfirmModal("flash"));
+  elements.restoreButton.addEventListener("click", () => openConfirmModal("restore"));
   elements.clearLogButton.addEventListener("click", clearLog);
   elements.cancelConfirmButton.addEventListener("click", closeConfirmModal);
   elements.nextConfirmButton.addEventListener("click", handleConfirmProgress);
