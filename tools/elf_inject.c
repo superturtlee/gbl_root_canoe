@@ -16,6 +16,7 @@ static int inject_elf(const char *elf_path, const char *abl_path, const char *ou
     elf_size = ftell(f);
     fseek(f, 0, SEEK_SET);
     elf_data = malloc(elf_size);
+    if (!elf_data) { fprintf(stderr, "malloc elf\n"); fclose(f); goto out; }
     if (fread(elf_data, 1, elf_size, f) != elf_size) { perror("read elf"); fclose(f); goto out; }
     fclose(f);
 
@@ -25,6 +26,7 @@ static int inject_elf(const char *elf_path, const char *abl_path, const char *ou
     abl_size = ftell(f);
     fseek(f, 0, SEEK_SET);
     abl_data = malloc(abl_size);
+    if (!abl_data) { fprintf(stderr, "malloc abl\n"); fclose(f); goto out; }
     if (fread(abl_data, 1, abl_size, f) != abl_size) { perror("read abl"); fclose(f); goto out; }
     fclose(f);
 
@@ -85,8 +87,12 @@ static int inject_elf(const char *elf_path, const char *abl_path, const char *ou
     int64_t diff = (int64_t)new_size - (int64_t)target_size;
     printf("New section size: 0x%lX (+0x%lX)\n", (unsigned long)new_size, (unsigned long)diff);
 
-    size_t output_size = elf_size + diff;
+    if (diff < 0 ? (size_t)(-diff) > elf_size : (size_t)diff > SIZE_MAX - elf_size) {
+        fprintf(stderr, "ERROR: output size overflow\n"); goto out;
+    }
+    size_t output_size = (diff >= 0) ? elf_size + (size_t)diff : elf_size - (size_t)(-diff);
     output = calloc(1, output_size);
+    if (!output) { fprintf(stderr, "calloc output\n"); goto out; }
 
     memcpy(output, elf_data, size_offset);
 
