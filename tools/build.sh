@@ -1,3 +1,4 @@
+set -euo pipefail
 
 SCRIPTDIR=$(dirname "$0")
 cd "$SCRIPTDIR"

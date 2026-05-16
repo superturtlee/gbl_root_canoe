@@ -587,8 +587,7 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
     INT32 patched_adrl = patch_adrl_unlocked_to_locked(data, size, 0);
     if (patched_adrl == 0){
         Print_patcher("Warning: ADRL triple not found, skipping\n");
-        free(data);
-        //return FALSE; not critical, continue with other patches
+        // not critical, continue with other patches
     }
 
     if(patched_adrl > 1){
@@ -598,8 +597,7 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
 
     if (patch_adrl_unlocked_to_locked_verify(data, size, 0) == 0){
         Print_patcher("Error: ADRL verification failed\n");
-        free(data);
-        //return FALSE;
+        // non-fatal for some ABL variants; continue
     }
     #endif
     #ifndef DISABLE_PATCH_6
@@ -611,14 +609,15 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
     INT32 num_patches = patch_abl_bootstate(data, size, &lock_register_num, &offset);
     if (num_patches == 0) {
         Print_patcher("Error: Failed to find/patch ABL Boot State\n");
-        free(data);
         return 0;
     }
     Print_patcher("Anchor offset : 0x%X\n", offset);
     Print_patcher("Lock register : W%d\n", (int)lock_register_num);
     Print_patcher("Boot patches: %d\n", num_patches);
 
-    if (find_ldrB_instructio_reverse(data, size, offset, lock_register_num) != 0) {
+    INT32 ldrb_patch_rc = find_ldrB_instructio_reverse(
+        data, size, offset, lock_register_num);
+    if (ldrb_patch_rc != 0) {
         Print_patcher("Warning: Failed to patch LDRB->STRB chain for W%d\n",
                (int)lock_register_num);
     }
