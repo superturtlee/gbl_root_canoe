@@ -251,7 +251,8 @@ RUNNING=${running}
 PID=${pid}
 STATE=${_state}
 MESSAGE=${_msg}
-UPDATED_AT=${_upd}"
+UPDATED_AT=${_upd}
+USER_LANG=${LANG}"
 
   emit "$_out"
 }
