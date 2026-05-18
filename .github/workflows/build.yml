@@ -1,52 +1,66 @@
 name: Build CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - 'README.md'
+      - 'LICENSE'
+  pull_request:
+    branches: [ main, master ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-    - name: Install dependencies
+    - name: Install Native Toolchains
       run: |
         sudo apt-get update
         sudo apt-get install -y lld clang llvm uuid-dev liblzma-dev mingw-w64 zip
 
-    - name: Setup Variables
+    - name: Setup Environment Variables
       run: |
         echo "NDK_PATH=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
 
-    - name: Run test
+    - name: Run Diagnostics / Verification Tests
       run: make test
 
-    - name: Build Toolkits
+    - name: Build Multi-Platform Toolkits
       run: |
         make clean
         DIST_NAME=toolkit make dist_loader
         make clean
         DIST_NAME=toolkit make dist_loader_windows
-      
-    - name: Build Magisk Module
+
+    - name: Build Magisk Module Payload
       run: |
         make clean
         DIST_NAME=magisk_module make build_module
 
-    - name: Upload Linux Toolkit
+    - name: Upload Linux Toolkit Artifact
       uses: actions/upload-artifact@v4
       with:
         name: toolkit_linux
         path: release/toolkit_linux.zip
+        if-no-files-found: error
+        retention-days: 7
 
-    - name: Upload Windows Toolkit
+    - name: Upload Windows Toolkit Artifact
       uses: actions/upload-artifact@v4
       with:
         name: toolkit_windows
         path: release/toolkit_windows.zip
+        if-no-files-found: error
+        retention-days: 7
 
-    - name: Upload Magisk Module
+    - name: Upload Magisk Module Artifact
       uses: actions/upload-artifact@v4
       with:
         name: magisk_module
         path: release/magisk_module.zip
+        if-no-files-found: error
+        retention-days: 14
