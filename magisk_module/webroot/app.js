@@ -201,9 +201,20 @@ function toast(message) {
 
 function moduleInfo() {
   const bridge = getKsuBridge();
-  if (!bridge?.moduleInfo) return null;
-  const raw = bridge.moduleInfo();
-  return typeof raw === "string" ? JSON.parse(raw) : raw;
+  if (!bridge) throw new Error("No Webui");
+
+  if (bridge.moduleInfo) {
+    const raw = bridge.moduleInfo();
+    return typeof raw === "string" ? JSON.parse(raw) : raw;
+  }
+
+  const found = extractStdout(
+    bridge.exec(
+      'for d in /data/adb/modules/*/; do [ -f "${d}bin/bl_flasher.sh" ] && printf "%s" "${d%/}" && break; done'
+    )
+  ).trim();
+  if (!found) throw new Error("Module Not Found");
+  return { moduleDir: found };
 }
 
 function extractStdout(raw) {

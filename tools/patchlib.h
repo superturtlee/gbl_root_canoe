@@ -578,8 +578,7 @@ BOOLEAN PatchBuffer(CHAR8* data, INT32 size) {
     INT32 patched_adrl = patch_adrl_unlocked_to_locked(data, size, 0);
     if (patched_adrl == 0){
         Print_patcher("Warning: ADRL triple not found, skipping\n");
-        free(data);
-        //return FALSE; not critical, continue with other patches
+        // not critical, continue with other patches
     }
 
     if(patched_adrl > 1){
