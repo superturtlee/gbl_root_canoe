@@ -6,6 +6,42 @@ on:
   workflow_call:
 
 jobs:
+  test-docker:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: false
+        load: true
+        tags: gbl_builder:ci
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build inside Docker container
+      run: |
+        docker run --rm -v "$(pwd)":/workspace -w /workspace gbl_builder:ci /bin/bash -c "
+          cp -r ./Conf ./edk2/
+          cd edk2 && . ./edksetup.sh && make BOARD_BOOTLOADER_PRODUCT_NAME=canoe TARGET_ARCHITECTURE=AARCH64 TARGET=RELEASE \
+            CLANG_BIN=/usr/bin/ CLANG_PREFIX=aarch64-linux-gnu- VERIFIED_BOOT_ENABLED=1 \
+            VERIFIED_BOOT_LE=0 AB_RETRYCOUNT_DISABLE=0 TARGET_BOARD_TYPE_AUTO=0 \
+            BUILD_USES_RECOVERY_AS_BOOT=0 DISABLE_PARALLEL_DOWNLOAD_FLASH=0 PVMFW_BCC_ENABLED=-DPVMFW_BCC \
+            REMOVE_CARVEOUT_REGION=1 QSPA_BOOTCONFIG_ENABLE=1 USER_BUILD_VARIANT=0 \
+            PREBUILT_HOST_TOOLS='BUILD_CC=clang BUILD_CXX=clang++ LDPATH=-fuse-ld=lld BUILD_AR=llvm-ar'
+        "
+        if [ ! -f edk2/Build/RELEASE_CLANG35/AARCH64/LinuxLoader.efi ]; then
+          echo "Failure: LinuxLoader.efi not found"
+          exit 1
+        fi
+        echo "LinuxLoader.efi built successfully"
+
   build:
     runs-on: ubuntu-latest
 
@@ -30,7 +66,7 @@ jobs:
         DIST_NAME=toolkit make dist_loader
         make clean
         DIST_NAME=toolkit make dist_loader_windows
-      
+
     - name: Build Magisk Module
       run: |
         make clean
