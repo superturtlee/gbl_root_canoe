@@ -742,12 +742,15 @@ EDBSPrintWithOffset (
   )
 {
   UINTN   Return;
+  UINTN   RemainingSize;
   VA_LIST Marker;
 
-  ASSERT (BufferSize - (Offset * sizeof(CHAR16)) > 0);
+  ASSERT (BufferSize > 0);
+  ASSERT (Offset < ((UINTN)BufferSize / sizeof (CHAR16)));
+  RemainingSize = (UINTN)BufferSize - (Offset * sizeof (CHAR16));
 
   VA_START (Marker, Format);
-  Return = UnicodeVSPrint (Buffer + Offset, (UINTN)(BufferSize - (Offset * sizeof(CHAR16))), Format, Marker);
+  Return = UnicodeVSPrint (Buffer + Offset, RemainingSize, Format, Marker);
   VA_END (Marker);
 
   return Return;
