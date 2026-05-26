@@ -171,7 +171,13 @@ Tcg2MeasureGptTable (
   //
   // Read the partition entry.
   //
-  EntryPtr = (UINT8 *)AllocatePool (PrimaryHeader->NumberOfPartitionEntries * PrimaryHeader->SizeOfPartitionEntry);
+  UINTN  PartitionEntrySize;
+
+  PartitionEntrySize = (UINTN)MultU64x32 (
+                              (UINT64)PrimaryHeader->NumberOfPartitionEntries,
+                              PrimaryHeader->SizeOfPartitionEntry
+                              );
+  EntryPtr = (UINT8 *)AllocatePool (PartitionEntrySize);
   if (EntryPtr == NULL) {
     FreePool (PrimaryHeader);
     return EFI_OUT_OF_RESOURCES;
@@ -180,7 +186,7 @@ Tcg2MeasureGptTable (
                      DiskIo,
                      BlockIo->Media->MediaId,
                      MultU64x32(PrimaryHeader->PartitionEntryLBA, BlockIo->Media->BlockSize),
-                     PrimaryHeader->NumberOfPartitionEntries * PrimaryHeader->SizeOfPartitionEntry,
+                     PartitionEntrySize,
                      EntryPtr
                      );
   if (EFI_ERROR (Status)) {
