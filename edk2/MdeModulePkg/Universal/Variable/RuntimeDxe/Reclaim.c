@@ -76,7 +76,7 @@ GetLbaAndOffsetByAddress (
         // Found the (Lba, Offset).
         //
         *Lba    = LbaIndex - 1;
-        *Offset = (UINTN) (Address - (FvbBaseAddress + FvbMapEntry->Length * (LbaIndex - 1)));
+        *Offset = (UINTN) (Address - (FvbBaseAddress + (EFI_PHYSICAL_ADDRESS)FvbMapEntry->Length * (LbaIndex - 1)));
         return EFI_SUCCESS;
      }
     }
