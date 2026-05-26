@@ -640,7 +640,7 @@ WriteBlockToPartitionNoFlush (EFI_BLOCK_IO_PROTOCOL *BlockIo,
     }
   }
 
-  if (Size - DivMsgBufSize > 0) {
+  if (Size > DivMsgBufSize) {
     ImageBuffer = AllocateZeroPool (WriteBlockSize);
     if (ImageBuffer == NULL) {
       DEBUG ((EFI_D_ERROR, "Failed to allocate zero pool for ImageBuffer\n"));
