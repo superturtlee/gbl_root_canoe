@@ -63,22 +63,41 @@ static size_t vbmeta_size(const struct avb_header *hdr) {
     return AVB_VBMETA_IMAGE_HEADER_SIZE + hdr->auth_block_size + hdr->aux_block_size;
 }
 
+/*
+ * Search for AVB footer by scanning backwards for "AVBf" magic.
+ * dd dumps the entire block device, so the footer may not be at the
+ * very end — there can be trailing zeros after the real partition data.
+ */
+static int find_avb_footer(const uint8_t *data, size_t len,
+                           uint64_t *vb_offset, uint64_t *vb_size) {
+    if (len < AVB_FOOTER_SIZE)
+        return 0;
+
+    /* scan backwards in 4-byte steps looking for "AVBf" */
+    size_t pos = len - AVB_FOOTER_SIZE;
+    while (1) {
+        if (memcmp(data + pos, AVB_FOOTER_MAGIC, 4) == 0) {
+            *vb_offset = be64(data + pos + 20);
+            *vb_size   = be64(data + pos + 28);
+            if (*vb_offset + *vb_size <= len)
+                return 1;
+        }
+        if (pos < 4)
+            break;
+        pos -= 4;
+    }
+    return 0;
+}
+
 /* returns vbmeta offset and size within partition data; -1 on error */
 static int locate_vbmeta(const uint8_t *data, size_t len,
                          size_t *out_offset, size_t *out_size) {
-    /* check for AVB footer at end */
-    if (len >= AVB_FOOTER_SIZE) {
-        const uint8_t *footer = data + len - AVB_FOOTER_SIZE;
-        if (memcmp(footer, AVB_FOOTER_MAGIC, 4) == 0) {
-            uint64_t vb_offset = be64(footer + 20);
-            uint64_t vb_size   = be64(footer + 28);
-            if (vb_offset + vb_size <= len) {
-                *out_offset = vb_offset;
-                *out_size   = vb_size;
-                printf("  Found AVB Footer: vbmeta offset=%zu, size=%zu\n", *out_offset, *out_size);
-                return 0;
-            }
-        }
+    uint64_t vb_offset, vb_size;
+    if (find_avb_footer(data, len, &vb_offset, &vb_size)) {
+        *out_offset = (size_t)vb_offset;
+        *out_size   = (size_t)vb_size;
+        printf("  Found AVB Footer: vbmeta offset=%zu, size=%zu\n", *out_offset, *out_size);
+        return 0;
     }
 
     /* no footer, read header directly */
@@ -348,46 +367,91 @@ int main(int argc, char **argv) {
         get_active_slot(slot, sizeof(slot));
     }
 
-    size_t part_size;
-    uint8_t *part_data = pull_and_read_partition("vbmeta", slot, output_dir, &part_size);
-    if (!part_data) {
-        fprintf(stderr, "Failed to pull vbmeta partition\n");
-        return 1;
-    }
+    static const char *roots[] = {
+        "vbmeta", "vbmeta_system",
+        "boot", "dtbo", "init_boot", "pvmfw",
+        "qtvm-dtbo", "recovery", "vendor_boot",
+        NULL
+    };
 
-    uint8_t *vbmeta_data = NULL;
-    size_t vbmeta_len = 0;
-    if (backup_vbmeta(part_data, part_size, "vbmeta", output_dir,
-                      &vbmeta_data, &vbmeta_len) != 0) {
-        free(part_data);
-        return 1;
-    }
-    free(part_data);
-
-    struct chain_partition chains[MAX_CHAINS];
-    int chain_count = parse_chain_partitions(vbmeta_data, vbmeta_len,
-                                             chains, MAX_CHAINS);
-
-    if (chain_count == 0)
-        printf("\n  No chain partitions\n");
-
-    for (int i = 0; i < chain_count; i++) {
-        printf("\nFound chain: %s (rollback_location=%u)\n",
-               chains[i].name, chains[i].rollback_index_location);
-
-        size_t chain_size;
-        uint8_t *chain_data = pull_and_read_partition(
-            chains[i].name, slot, output_dir, &chain_size);
-        if (!chain_data) {
-            fprintf(stderr, "  Failed to pull: %s\n", chains[i].name);
+    for (int r = 0; roots[r]; r++) {
+        /* skip this root if already backed up */
+        char check_path[MAX_PATH_LEN];
+        snprintf(check_path, sizeof(check_path), "%s/%s.vbmeta", output_dir, roots[r]);
+        FILE *chk = fopen(check_path, "rb");
+        if (chk) {
+            fclose(chk);
+            printf("\n[%s] Already backed up, skipping tree\n", roots[r]);
             continue;
         }
 
-        backup_vbmeta(chain_data, chain_size, chains[i].name, output_dir, NULL, NULL);
-        free(chain_data);
-    }
+        printf("\n======== Root: %s ========\n", roots[r]);
 
-    free(vbmeta_data);
+        size_t part_size;
+        uint8_t *part_data = pull_and_read_partition(roots[r], slot, output_dir, &part_size);
+        if (!part_data) {
+            fprintf(stderr, "  Failed to pull root: %s (may not exist, skipping)\n", roots[r]);
+            continue;
+        }
+
+        uint8_t *root_vbmeta = NULL;
+        size_t root_vbmeta_len = 0;
+        if (backup_vbmeta(part_data, part_size, roots[r], output_dir,
+                          &root_vbmeta, &root_vbmeta_len) != 0) {
+            free(part_data);
+            continue;
+        }
+        free(part_data);
+
+        /* BFS from this root */
+        struct {
+            uint8_t *data;
+            size_t len;
+            char name[MAX_PARTITION_NAME];
+        } queue[MAX_CHAINS];
+        int q_head = 0, q_tail = 0;
+
+        queue[q_tail].data = root_vbmeta;
+        queue[q_tail].len = root_vbmeta_len;
+        snprintf(queue[q_tail].name, MAX_PARTITION_NAME, "%s", roots[r]);
+        q_tail++;
+
+        while (q_head < q_tail) {
+            uint8_t *cur_data = queue[q_head].data;
+            size_t cur_len = queue[q_head].len;
+
+            struct chain_partition chains[MAX_CHAINS];
+            int chain_count = parse_chain_partitions(cur_data, cur_len,
+                                                     chains, MAX_CHAINS);
+
+            for (int i = 0; i < chain_count && q_tail < MAX_CHAINS; i++) {
+                printf("\n  Found chain: %s (rollback_location=%u)\n",
+                       chains[i].name, chains[i].rollback_index_location);
+
+                size_t chain_size;
+                uint8_t *chain_data = pull_and_read_partition(
+                    chains[i].name, slot, output_dir, &chain_size);
+                if (!chain_data) {
+                    fprintf(stderr, "    Failed to pull: %s\n", chains[i].name);
+                    continue;
+                }
+
+                uint8_t *chain_vbmeta = NULL;
+                size_t chain_vbmeta_len = 0;
+                if (backup_vbmeta(chain_data, chain_size, chains[i].name, output_dir,
+                                  &chain_vbmeta, &chain_vbmeta_len) == 0 && chain_vbmeta) {
+                    queue[q_tail].data = chain_vbmeta;
+                    queue[q_tail].len = chain_vbmeta_len;
+                    snprintf(queue[q_tail].name, MAX_PARTITION_NAME, "%s", chains[i].name);
+                    q_tail++;
+                }
+                free(chain_data);
+            }
+
+            free(cur_data);
+            q_head++;
+        }
+    }
 
     printf("\nBackup complete, files saved to: %s\n", output_dir);
 
