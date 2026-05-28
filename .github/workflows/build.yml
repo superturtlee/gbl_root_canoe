@@ -23,14 +23,11 @@ jobs:
 
     - name: Build Toolkits
       run: |
-        make clean
         make target_toolkit_linux
-        make clean
         make target_toolkit_windows
       
     - name: Build Magisk Module
       run: |
-        make clean
         make target_magisk_module
 
     - name: Unpack artifacts
