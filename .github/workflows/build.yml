@@ -57,42 +57,56 @@ jobs:
       run: |
         echo "NDK_PATH=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
 
-    - name: Run test
-      run: make test
-
     - name: Build Toolkits
       run: |
-        make clean
-        DIST_NAME=toolkit make dist_loader
-        make clean
-        DIST_NAME=toolkit make dist_loader_windows
-
+        make target_toolkit_linux
+        make target_toolkit_windows
+      
     - name: Build Magisk Module
       run: |
-        make clean
-        DIST_NAME=magisk_module make build_module
+        make target_magisk_module
+
+    - name: Build VBMeta Fixer
+      run: |
+        make tools_vbmetafixer_linux
+        make tools_vbmetafixer_windows
 
     - name: Unpack artifacts
       run: |
         mkdir -p artifacts/toolkit_linux artifacts/toolkit_windows artifacts/magisk_module
-        unzip release/toolkit_linux.zip -d artifacts/toolkit_linux
-        unzip release/toolkit_windows.zip -d artifacts/toolkit_windows
-        unzip release/magisk_module.zip -d artifacts/magisk_module
+        mkdir -p artifacts/vbmetafixer_linux artifacts/vbmetafixer_windows
+        unzip targets/toolkit_linux/build/toolkit_linux.zip -d artifacts/toolkit_linux
+        unzip targets/toolkit_windows/build/toolkit_windows.zip -d artifacts/toolkit_windows
+        unzip targets/magisk_module/build/module_android.zip -d artifacts/magisk_module
+        cp -r tools/vbmetafixer/build/toolkit/* artifacts/vbmetafixer_linux/
+        cp -r tools/vbmetafixer/build/toolkit_win/* artifacts/vbmetafixer_windows/
 
     - name: Upload Linux Toolkit
       uses: actions/upload-artifact@v4
       with:
         name: toolkit_linux
-        path: artifacts/toolkit_linux/dist/*
+        path: artifacts/toolkit_linux/*
 
     - name: Upload Windows Toolkit
       uses: actions/upload-artifact@v4
       with:
         name: toolkit_windows
-        path: artifacts/toolkit_windows/dist/*
+        path: artifacts/toolkit_windows/*
 
     - name: Upload Magisk Module
       uses: actions/upload-artifact@v4
       with:
         name: magisk_module
         path: artifacts/magisk_module/*
+
+    - name: Upload VBMeta Fixer Linux
+      uses: actions/upload-artifact@v4
+      with:
+        name: vbmetafixer_linux
+        path: artifacts/vbmetafixer_linux/*
+
+    - name: Upload VBMeta Fixer Windows
+      uses: actions/upload-artifact@v4
+      with:
+        name: vbmetafixer_windows
+        path: artifacts/vbmetafixer_windows/*

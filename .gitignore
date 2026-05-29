@@ -24,12 +24,10 @@ ENV/
 *.img
 *.efi
 extracted/
-build/
-release/
-third_party/
-dist/
 
 # VS Code
 .vscode/
 
-edk2/build_modulepkg.log
+submodules/uefi/edk2/build_modulepkg.log
+
+submodules/unsigned_abl.elf
