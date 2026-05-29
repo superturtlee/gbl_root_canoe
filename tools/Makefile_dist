@@ -1,2 +1,0 @@
-build:
-	bash ./build.sh

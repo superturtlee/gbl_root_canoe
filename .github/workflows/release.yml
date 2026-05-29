@@ -25,6 +25,8 @@ jobs:
         cd toolkit_linux && zip -r ../toolkit_linux.zip . && cd ..
         cd toolkit_windows && zip -r ../toolkit_windows.zip . && cd ..
         cd magisk_module && zip -r ../magisk_module.zip . && cd ..
+        cd vbmetafixer_linux && zip -r ../vbmetafixer_linux.zip . && cd ..
+        cd vbmetafixer_windows && zip -r ../vbmetafixer_windows.zip . && cd ..
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
@@ -35,3 +37,5 @@ jobs:
           toolkit_linux.zip
           toolkit_windows.zip
           magisk_module.zip
+          vbmetafixer_linux.zip
+          vbmetafixer_windows.zip

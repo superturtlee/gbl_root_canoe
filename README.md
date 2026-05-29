@@ -15,35 +15,29 @@ You must be on a **Linux** host to build the project:
 - `gcc` / `clang`, `lld`, `make`, `zip`, `python3`
 - `liblzma-dev` (for compiling `extractfv`)
 - **Android NDK** (Required for `make build_module` to cross-compile tools for Android)
-- **MinGW-w64** (`x86_64-w64-mingw32-gcc`, required for `make dist_loader_windows` cross-compilation)
+- **MinGW-w64**
 
 ### Build Targets
 
-**Note:** You **do not** need to provide an `abl.img` to build the distributable toolkits or Magisk module. Set the `DIST_NAME` environment variable to name your release ZIP (e.g., `DIST_NAME=my_toolkit make dist_loader`).
+**Note:** You **do not** need to provide an `abl.img` to build the distributable toolkits or Magisk module.
 
-- **`make dist_loader`**
-  Builds the EDK2 native payload (`loader.elf`) and compiles the patching utilities (`extractfv`, `patch_abl`, `elf_inject`, etc.) for Linux. Packages them into a `.zip` in `release/`.
+- **`make target_toolkit_linux`**
+  Builds the EDK2 native payload (`loader.elf`) and compiles the patching utilities (`extractfv`, `patch_abl`, `elf_inject`, etc.) for Linux.
 
-- **`make dist_loader_windows`**
+- **`make target_toolkit_windows`**
   Similar to `dist_loader`, but cross-compiles the patching utilities into Windows `.exe` programs using MinGW-w64.
 
-- **`make build_module`**
-  Cross-compiles the patcher tools for Android using your NDK and builds the EDK2 payload. Packages them into a Magisk Module zip in `release/`.
+- **`make target_magisk_module`**
+  Cross-compiles the patcher tools for Android using your NDK and builds the EDK2 payload.
 
-- **`make dist`**
-  Builds the pre-patched EFI for a specific device model.
-
-- **`make build_superfbonly`**
-  Builds only `superfastboot`, changing the original embedded EFI startup location to return control directly to ABL (for debugging purposes, no fake-lock effect).
-
-- **`make build_generic`**
+- **`make target_generic_efi`**
   Embeds the patch tools, aiming to be universal across multiple device models. However, high-version compatibility is poor, and it is gradually being deprecated.
 
 ---
 
 ## User Guide
 
-This section is for end-users using the compiled outputs found in the `release/` directory. For more detailed instructions, please refer to the [Wiki](https://github.com/superturtlee/gbl_root_canoe/wiki).
+For more detailed instructions, please refer to the [Wiki](https://github.com/superturtlee/gbl_root_canoe/wiki).
 
 ### 1. Using the Magisk Module (On-Device)
 
@@ -61,7 +55,7 @@ When flashing the Magisk module via a root manager (like KernelSU, Magisk, or AP
 
 ### 2. Using the PC Toolkits (Linux / Windows)
 
-If you downloaded the `dist_loader` or `dist_loader_windows` zip files:
+If you downloaded the `target_toolkit_linux` or `target_toolkit_windows` zip files:
 1. Extract the toolkit zip on your PC.
 2. Place your device's stock `abl.img` inside the `images/` (or `images\`) directory of the toolkit.
 3. **Linux:** Run `bash build.sh` (or `make build`). **Windows:** Run `build.bat`.
