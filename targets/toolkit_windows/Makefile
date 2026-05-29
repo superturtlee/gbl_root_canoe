@@ -10,6 +10,6 @@ submodule_patcher: copy_resources
 submodule_ablfvextractor: copy_resources
 	cd ../../submodules/ablfvextractor && make build_windows
 	cp ../../submodules/ablfvextractor/build/extractfv.exe ./build/toolkit/bin/extractfv.exe
-build: submodule_uefi submodule_patcher submodule_elflinker submodule_ablfvextractor
+build: submodule_patcher submodule_ablfvextractor
 	# zip
 	cd build/toolkit && zip -r ../toolkit_windows.zip ./
