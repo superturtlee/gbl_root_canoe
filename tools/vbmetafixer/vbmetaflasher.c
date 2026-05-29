@@ -95,7 +95,6 @@ static int file_exists(const char *path) {
 
 static int get_exe_dir(char *buf, size_t buf_size) {
 #ifdef _WIN32
-    /* GetModuleFileName */
     extern unsigned long __stdcall GetModuleFileNameA(void*, char*, unsigned long);
     unsigned long len = GetModuleFileNameA(NULL, buf, (unsigned long)buf_size);
     if (len == 0 || len >= buf_size) return -1;
@@ -104,7 +103,6 @@ static int get_exe_dir(char *buf, size_t buf_size) {
     if (len <= 0) return -1;
     buf[len] = '\0';
 #endif
-    /* strip filename, keep directory */
     char *last_sep = strrchr(buf, PATH_SEP);
 #ifdef _WIN32
     if (!last_sep) last_sep = strrchr(buf, '/');
@@ -207,7 +205,6 @@ static int transplant_vbmeta(const char *vbmeta_path, const char *source_image,
         return -1;
     }
 
-    /* verify */
     uint64_t v_orig, v_off, v_sz;
     if (read_avb_footer(output, target_size, &v_orig, &v_off, &v_sz)) {
         if (v_off + v_sz <= target_size &&
@@ -290,7 +287,6 @@ static int check_and_run_backup(const char *exe_dir) {
     if (run_backup(exe_dir) != 0)
         return -1;
 
-    /* create marker */
     FILE *f = fopen(marker, "w");
     if (f) {
         fprintf(f, "done\n");
@@ -321,7 +317,44 @@ static void read_line(const char *prompt, char *buf, size_t size) {
         buf[strcspn(buf, "\r\n")] = '\0';
 }
 
-/* ---- main ---- */
+/* ============================== */
+/* ✅ 新增：重启选择函数（你要的功能） */
+/* ============================== */
+static void reboot_menu(void) {
+    char opt[16];
+    char cmd[MAX_CMD_LEN];
+
+    printf("\n=============================================\n");
+    printf("Flash done! Select reboot mode:\n");
+    printf("1 = Reboot to Recovery\n");
+    printf("2 = Reboot to FastbootD\n");
+    printf("3 = Reboot to Bootloader\n");
+    printf("4 = Reboot to System\n");
+    printf("0 = Do not reboot\n");
+    printf("=============================================\n");
+    printf("Your choice: ");
+    fflush(stdout);
+    fgets(opt, sizeof(opt), stdin);
+    opt[strcspn(opt, "\r\n")] = 0;
+
+    if (!strcmp(opt, "1")) {
+        snprintf(cmd, sizeof(cmd), "%s reboot recovery", fastboot_path);
+        system(cmd);
+    } else if (!strcmp(opt, "2")) {
+        snprintf(cmd, sizeof(cmd), "%s reboot fastboot", fastboot_path);
+        system(cmd);
+    } else if (!strcmp(opt, "3")) {
+        snprintf(cmd, sizeof(cmd), "%s reboot bootloader", fastboot_path);
+        system(cmd);
+    } else if (!strcmp(opt, "4")) {
+        snprintf(cmd, sizeof(cmd), "%s reboot", fastboot_path);
+        system(cmd);
+    } else {
+        printf("Skip reboot.\n");
+    }
+}
+
+/* ---- usage ---- */
 
 static void usage(const char *prog) {
     printf("Usage: %s [-f fastboot_path] [partition] [image]\n\n", prog);
@@ -332,6 +365,8 @@ static void usage(const char *prog) {
     printf("Slot suffixes (_a, _b, _ab) are stripped to find matching vbmeta backup.\n");
 }
 
+/* ---- main ---- */
+
 int main(int argc, char **argv) {
     char exe_dir[MAX_PATH_LEN];
     if (get_exe_dir(exe_dir, sizeof(exe_dir)) != 0) {
@@ -340,7 +375,6 @@ int main(int argc, char **argv) {
     }
     printf("Working directory: %s\n", exe_dir);
 
-    /* parse args */
     const char *partition_arg = NULL;
     const char *image_arg = NULL;
     int positional = 0;
@@ -364,11 +398,9 @@ int main(int argc, char **argv) {
         }
     }
 
-    /* backup check */
     if (check_and_run_backup(exe_dir) != 0)
         return 1;
 
-    /* get partition */
     char partition_buf[MAX_INPUT_LEN];
     if (!partition_arg) {
         read_line("Partition name (e.g. boot_a, boot_ab): ", partition_buf, sizeof(partition_buf));
@@ -379,7 +411,6 @@ int main(int argc, char **argv) {
         partition_arg = partition_buf;
     }
 
-    /* get image path */
     char image_buf[MAX_PATH_LEN];
     if (!image_arg) {
         read_line("Image file path: ", image_buf, sizeof(image_buf));
@@ -395,12 +426,10 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    /* derive base partition name */
     char base_name[MAX_INPUT_LEN];
     strip_slot_suffix(partition_arg, base_name, sizeof(base_name));
     printf("Partition: %s (base: %s)\n", partition_arg, base_name);
 
-    /* check for vbmeta backup */
     char vbmeta_path[MAX_PATH_LEN];
     snprintf(vbmeta_path, sizeof(vbmeta_path), "%s%cvbmetas%c%s.vbmeta",
              exe_dir, PATH_SEP, PATH_SEP, base_name);
@@ -431,16 +460,19 @@ int main(int argc, char **argv) {
         printf("No vbmeta backup for '%s', flashing original image\n", base_name);
     }
 
-    /* flash */
     printf("\nFlashing %s -> %s\n", flash_image, partition_arg);
     int ret = flash_partition(partition_arg, flash_image);
 
-    /* cleanup temp */
     if (temp_image[0])
         remove(temp_image);
 
-    if (ret == 0)
+    if (ret == 0) {
         printf("\nFlash complete!\n");
+        // ======================
+        // ✅ 调用重启菜单
+        // ======================
+        reboot_menu();
+    }
 
     return ret;
 }
