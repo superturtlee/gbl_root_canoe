@@ -27,7 +27,7 @@ jobs:
 
     - name: Build inside Docker container
       run: |
-        docker run --rm -v "$(pwd)":/workspace -w /workspace gbl_builder:ci /bin/bash -c "
+        docker run --rm -v "$(pwd)":/workspace -w /workspace/submodules/uefi gbl_builder:ci /bin/bash -c "
           cp -r ./Conf ./edk2/
           cd edk2 && . ./edksetup.sh && make BOARD_BOOTLOADER_PRODUCT_NAME=canoe TARGET_ARCHITECTURE=AARCH64 TARGET=RELEASE \
             CLANG_BIN=/usr/bin/ CLANG_PREFIX=aarch64-linux-gnu- VERIFIED_BOOT_ENABLED=1 \
@@ -36,7 +36,7 @@ jobs:
             REMOVE_CARVEOUT_REGION=1 QSPA_BOOTCONFIG_ENABLE=1 USER_BUILD_VARIANT=0 \
             PREBUILT_HOST_TOOLS='BUILD_CC=clang BUILD_CXX=clang++ LDPATH=-fuse-ld=lld BUILD_AR=llvm-ar'
         "
-        if [ ! -f edk2/Build/RELEASE_CLANG35/AARCH64/LinuxLoader.efi ]; then
+        if [ ! -f submodules/uefi/edk2/Build/RELEASE_CLANG35/AARCH64/LinuxLoader.efi ]; then
           echo "Failure: LinuxLoader.efi not found"
           exit 1
         fi
