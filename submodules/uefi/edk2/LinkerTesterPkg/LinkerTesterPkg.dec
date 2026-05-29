@@ -1,5 +1,0 @@
-[Defines]
-  DEC_SPECIFICATION              = 0x00010005
-  PACKAGE_NAME                   = LinkerTesterPkg
-  PACKAGE_GUID             = FEDCBA98-7654-3210-FEDC-BA9876543210
-  PACKAGE_VERSION           = 1.0
