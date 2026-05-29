@@ -171,13 +171,20 @@ Tcg2MeasureGptTable (
   //
   // Read the partition entry.
   //
-  UINTN  PartitionEntrySize;
+  UINTN   PartitionEntrySize;
+  UINT64  PartitionEntrySize64;
 
-  PartitionEntrySize = (UINTN)MultU64x32 (
-                              (UINT64)PrimaryHeader->NumberOfPartitionEntries,
-                              PrimaryHeader->SizeOfPartitionEntry
-                              );
+  PartitionEntrySize64 = MultU64x32 (
+                           (UINT64)PrimaryHeader->NumberOfPartitionEntries,
+                           PrimaryHeader->SizeOfPartitionEntry
+                           );
+  if (PartitionEntrySize64 > MAX_UINTN) {
+    FreePool (PrimaryHeader);
+    return EFI_OUT_OF_RESOURCES;
+  }
+  PartitionEntrySize = (UINTN)PartitionEntrySize64;
   EntryPtr = (UINT8 *)AllocatePool (PartitionEntrySize);
+  
   if (EntryPtr == NULL) {
     FreePool (PrimaryHeader);
     return EFI_OUT_OF_RESOURCES;
