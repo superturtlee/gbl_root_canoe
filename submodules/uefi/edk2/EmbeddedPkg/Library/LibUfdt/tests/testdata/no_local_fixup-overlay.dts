@@ -1,6 +1,0 @@
-/dts-v1/;
-/plugin/;
-
-&a { c = "new-c";
-  d: d = "d";
-};

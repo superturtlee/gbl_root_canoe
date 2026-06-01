@@ -1,15 +1,9 @@
-submodule_uefi_clean:
-	cd submodules/uefi && make clean
 submodule_patcher_clean:
 	cd submodules/patcher && make clean
-submodule_elflinker_clean:
-	cd submodules/elflinker && make clean
 submodule_ablfvextractor_clean:
 	cd submodules/ablfvextractor && make clean
 clean_submodules: submodule_uefi_clean submodule_patcher_clean submodule_elflinker_clean submodule_ablfvextractor_clean
 
-target_generic_efi_clean: 
-	cd targets/generic_efi && make clean
 target_toolkit_windows_clean:
 	cd targets/toolkit_windows && make clean
 target_toolkit_linux_clean:
@@ -20,8 +14,6 @@ targets_clean: clean_submodules target_generic_efi_clean target_toolkit_windows_
 
 clean: targets_clean clean_submodules
 
-target_generic_efi:
-	cd targets/generic_efi && make build
 target_toolkit_windows:
 	cd targets/toolkit_windows && make build 
 target_toolkit_linux:

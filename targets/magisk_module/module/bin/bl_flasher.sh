@@ -149,15 +149,6 @@ patch_efisp() {
   cat $RUNTIME_DIR/patch.log >> "$LOG_FILE"
   [ -f $RUNTIME_DIR/patched.efi ] || { write_log "$TEXT_PATCH_FAILED"; return 1; }
 
-  if [ "$is_sfb" = "with-superfastboot" ]; then
-    write_log "$TEXT_INJECT_SFB"
-    [ -f "$MODDIR/loader.elf" ] || { write_log "$TEXT_NO_LOADER_ELF"; return 1; }
-    $MODDIR/bin/elf_inject "$MODDIR/loader.elf" $RUNTIME_DIR/patched.efi $RUNTIME_DIR/injected.dll >> "$LOG_FILE" 2>&1
-    [ -f $RUNTIME_DIR/injected.dll ] || { write_log "$TEXT_INJECT_FAILED"; return 1; }
-    $MODDIR/bin/GenFw -e UEFI_APPLICATION -o $RUNTIME_DIR/patched.efi $RUNTIME_DIR/injected.dll >> "$LOG_FILE" 2>&1
-    write_log "$TEXT_INJECT_OK"
-  fi
-
   if [ "$is_debug" = "debug" ]; then
     write_log "$TEXT_DEBUG_MODE"
     return 0
@@ -222,18 +213,9 @@ run_flash() {
   mode=$1
   sfb=no
   debug=no
-  if [ "$mode" = "update-efisp-with-superfastboot" ]; then
-    mode=update-efisp
-    sfb=with-superfastboot
-  fi
   if [ "$mode" = "debug" ]; then
     debug=yes
     mode=skip-efisp
-  fi
-  if [ "$mode" = "debug-with-superfastboot" ]; then
-    debug=yes
-    mode=update-efisp
-    sfb=with-superfastboot
   fi
 
   ensure_runtime

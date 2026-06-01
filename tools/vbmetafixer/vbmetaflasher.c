@@ -269,7 +269,11 @@ static int run_backup(const char *exe_dir) {
     fflush(stdout);
     getchar();
 
+#ifdef _WIN32
+    snprintf(cmd, sizeof(cmd), "cmd /C \"\"%s\" -o \"%s\"\"", backup_bin, vbmetas_dir);
+#else
     snprintf(cmd, sizeof(cmd), "\"%s\" -o \"%s\"", backup_bin, vbmetas_dir);
+#endif
     printf("\n");
     int ret = system(cmd);
     if (ret != 0) {
@@ -304,7 +308,11 @@ static int check_and_run_backup(const char *exe_dir) {
 
 static int flash_partition(const char *partition, const char *image_path) {
     char cmd[MAX_CMD_LEN];
-    snprintf(cmd, sizeof(cmd), "%s flash %s \"%s\"", fastboot_path, partition, image_path);
+#ifdef _WIN32
+    snprintf(cmd, sizeof(cmd), "cmd /C \"\"%s\" flash %s \"%s\"\"", fastboot_path, partition, image_path);
+#else
+    snprintf(cmd, sizeof(cmd), "\"%s\" flash %s \"%s\"", fastboot_path, partition, image_path);
+#endif
     printf("$ %s\n", cmd);
     int ret = system(cmd);
     if (ret != 0)
