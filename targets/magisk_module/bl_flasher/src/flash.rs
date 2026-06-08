@@ -1,5 +1,6 @@
 use anyhow::{bail, Result};
 use serde_json::json;
+use std::sync::OnceLock;
 use std::fs;
 use std::process::Command;
 
@@ -9,6 +10,8 @@ use crate::util::{
     acquire_lock, current_pid, detect_current_slot, ensure_runtime, other_slot,
     partition_path, release_lock, runtime_dir, set_path_env,
 };
+
+static CTRLC_SET: OnceLock<()> = OnceLock::new();
 
 fn parse_mode(mode: &str) -> (&str, bool, bool) {
     let mut actual = mode;
@@ -39,6 +42,13 @@ pub fn run_flash(mode: &str) -> Result<()> {
         write_log("Task is already running");
         bail!("busy");
     }
+
+    CTRLC_SET.get_or_init(|| {
+        let _ = ctrlc::set_handler(|| {
+            release_lock();
+            std::process::exit(1);
+        });
+    });
 
     let pid = std::process::id();
     let _ = fs::write(crate::util::pid_file(), pid.to_string());

@@ -40,7 +40,7 @@ fn print_log(tail: bool) {
     }
 }
 
-fn print_log_json() {
+fn print_log_json(tail: usize) {
     let lf = crate::util::log_file();
     if !lf.exists() {
         println!("[]");
@@ -55,9 +55,15 @@ fn print_log_json() {
     };
     let reader = BufReader::new(f);
     let lines: Vec<String> = reader.lines().filter_map(|l| l.ok()).collect();
+
+    let start = if tail > 0 && lines.len() > tail {
+        lines.len() - tail
+    } else {
+        0
+    };
     println!(
         "{}",
-        serde_json::to_string(&lines).unwrap_or_else(|_| "[]".into())
+        serde_json::to_string(&lines[start..]).unwrap_or_else(|_| "[]".into())
     );
 }
 
@@ -97,7 +103,10 @@ fn main() {
         }
         "log" => print_log(false),
         "tail" => print_log(true),
-        "log-json" => print_log_json(),
+        "log-json" => {
+            let n = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(200);
+            print_log_json(n);
+        }
         "clear-log" => clear_log(),
         _ => process::exit(1),
     }
