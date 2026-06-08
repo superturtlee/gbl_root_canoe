@@ -31,17 +31,31 @@ function shellQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
+const FALLBACK_STATUS: Status = {
+  current_slot: '-',
+  target_slot: '-',
+  running: false,
+  pid: null,
+  state: 'error',
+  message: 'Binary communication failed',
+  updated_at: '',
+};
+
 export function getStatus(): Status {
-  const raw = run('status');
-  return JSON.parse(raw);
+  try {
+    const raw = run('status');
+    return JSON.parse(raw);
+  } catch {
+    return FALLBACK_STATUS;
+  }
 }
 
 export function getLog(): string[] {
-  const raw = run('log-json');
   try {
+    const raw = run('log-json 200');
     return JSON.parse(raw);
   } catch {
-    return [raw];
+    return [];
   }
 }
 
@@ -50,13 +64,21 @@ export function getLogTail(n: number = 200): string {
 }
 
 export function startFlash(mode: string): StartResult {
-  const raw = run(`start ${mode}`);
-  return JSON.parse(raw);
+  try {
+    const raw = run(`start ${mode}`);
+    return JSON.parse(raw);
+  } catch {
+    return { started: false, error: 'Binary communication failed' };
+  }
 }
 
 export function clearLog(): ClearResult {
-  const raw = run('clear-log');
-  return JSON.parse(raw);
+  try {
+    const raw = run('clear-log');
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
 }
 
 export const FLASH_MODES = {
