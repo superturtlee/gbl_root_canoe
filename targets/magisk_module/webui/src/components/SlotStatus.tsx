@@ -66,7 +66,7 @@ export default function SlotStatus({ status, onRefresh }: Props) {
 
   return (
     <>
-      <section className="panel panel--elevated stats-panel">
+      <section className="panel panel-high stats-panel">
         <div className="panel-head">
           <h2>{t('slot.status')}</h2>
           <div className="panel-head-actions">

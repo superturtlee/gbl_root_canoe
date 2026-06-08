@@ -20,7 +20,7 @@ export default function LogPanel({ log, status }: Props) {
   const display = log || t('log.waiting');
 
   return (
-    <section className="panel panel--elevated log-panel">
+    <section className="panel panel-low log-panel">
       <div className="panel-head">
         <h2>{t('log.title')}</h2>
         <span className="caption">{status?.running ? t('log.auto') : ''}</span>

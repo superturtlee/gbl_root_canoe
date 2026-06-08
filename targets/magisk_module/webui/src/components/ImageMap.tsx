@@ -8,7 +8,7 @@ export default function ImageMap({ status }: { status: Status | null }) {
 
   if (!cur || !tar || cur === '-' || tar === '-') {
     return (
-      <section className="panel panel--outlined map-panel">
+    <section className="panel panel-medium map-panel">
         <div className="panel-head">
           <h2>{t('img.map')}</h2>
         </div>
