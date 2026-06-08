@@ -1,17 +1,12 @@
 import { useI18n } from '../I18nContext';
-import { type Lang } from '../i18n';
-
-const LANG_LABELS: Record<Lang, string> = {
-  zh: '中',
-  en: 'EN',
-};
 
 export default function LangSwitcher() {
-  const { lang, setLang, langs } = useI18n();
+  const { lang, setLang, langs, label } = useI18n();
 
   if (langs.length <= 1) return null;
 
-  const next = langs[(langs.indexOf(lang) + 1) % langs.length];
+  const idx = langs.indexOf(lang);
+  const next = langs[(idx + 1) % langs.length];
 
   return (
     <button
@@ -19,7 +14,7 @@ export default function LangSwitcher() {
       onClick={() => setLang(next)}
       title={next}
     >
-      {LANG_LABELS[lang]}
+      {label(lang)}
     </button>
   );
 }

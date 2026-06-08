@@ -1,5 +1,5 @@
 import { useState, useMemo, useSyncExternalStore } from 'react';
-import { get, switchLang, available, t, onLangChange } from './i18n';
+import { get, switchLang, available, t, langLabel, onLangChange } from './i18n';
 import { I18nContext } from './I18nContext';
 import { usePolling } from './hooks/usePolling';
 import HeroCard from './components/HeroCard';
@@ -20,11 +20,12 @@ export default function App() {
   const i18nCtx = useMemo(() => ({
     lang,
     t,
-    setLang: (l: typeof lang) => {
+    setLang: (l: string) => {
       switchLang(l);
       forceRender(n => n + 1);
     },
     langs: available(),
+    label: langLabel,
   }), [lang]);
 
   const { status, log, refresh } = usePolling();

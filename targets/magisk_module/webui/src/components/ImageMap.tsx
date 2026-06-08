@@ -45,7 +45,7 @@ export default function ImageMap({ status }: { status: Status | null }) {
                 <td>{name}</td>
                 <td className="caption">/dev/block/by-name/{name}{cur}</td>
                 <td>/dev/block/by-name/{name}{tar}</td>
-                <td><span className="pill pill--ok">Copy</span></td>
+                <td><span className="pill pill--ok">{t('status.copyPart')}</span></td>
               </tr>
             ))}
           </tbody>
