@@ -54,6 +54,7 @@ pub fn run_flash(mode: &str) -> Result<()> {
     let _ = fs::write(crate::util::pid_file(), pid.to_string());
 
     fs::write(crate::util::log_file(), "")?;
+    write_log("Task started");
 
     let cs = detect_current_slot().ok_or_else(|| anyhow::anyhow!("slot detection failed"))?;
     let ts = other_slot(&cs).ok_or_else(|| anyhow::anyhow!("target slot detection failed"))?;
