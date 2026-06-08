@@ -13,6 +13,7 @@ unzip -o "$ZIPFILE" 'module.prop' -d "$MODPATH" >&2
 unzip -o "$ZIPFILE" 'uninstall.sh' -d "$MODPATH" >&2
 unzip -o "$ZIPFILE" 'bin/*' -d "$MODPATH" >&2
 unzip -o "$ZIPFILE" 'webroot/*' -d "$MODPATH" >&2
+[ -f "$MODPATH/loader.elf" ] || unzip -o "$ZIPFILE" 'loader.elf' -d "$MODPATH" >&2
 
 ui_print "- Setting permissions / 设置权限..."
 set_perm_recursive "$MODPATH/bin" 0 0 0755 0755
