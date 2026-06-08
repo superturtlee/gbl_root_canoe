@@ -2,7 +2,8 @@ use anyhow::{bail, Result};
 use serde_json::json;
 use std::sync::OnceLock;
 use std::fs;
-use std::process::Command;
+use std::fs::OpenOptions;
+use std::process::{Command, Stdio};
 
 use crate::patch::{detect_gbl_vulnerability, patch_efisp};
 use crate::status::{write_log, write_state};
@@ -53,7 +54,6 @@ pub fn run_flash(mode: &str) -> Result<()> {
     let pid = std::process::id();
     let _ = fs::write(crate::util::pid_file(), pid.to_string());
 
-    fs::write(crate::util::log_file(), "")?;
     write_log("Task started");
 
     let cs = detect_current_slot().ok_or_else(|| anyhow::anyhow!("slot detection failed"))?;
@@ -184,11 +184,30 @@ pub fn start_flash(mode: &str) {
         }
     };
 
+    let lf = crate::util::log_file();
+    let _ = fs::write(&lf, "");
+
+    let file = match OpenOptions::new().create(true).append(true).open(&lf) {
+        Ok(f) => f,
+        Err(e) => {
+            println!("{}", json!({"started": false, "error": e.to_string()}));
+            return;
+        }
+    };
+
+    let stdout_dup = match file.try_clone() {
+        Ok(f) => f,
+        Err(_) => {
+            println!("{}", json!({"started": false, "error": "clone fd failed"}));
+            return;
+        }
+    };
+
     match Command::new(&exe)
         .arg("flash")
         .arg(mode)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stdout(Stdio::from(stdout_dup))
+        .stderr(Stdio::from(file))
         .spawn()
     {
         Ok(_) => {

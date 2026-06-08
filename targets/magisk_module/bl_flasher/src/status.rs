@@ -1,10 +1,9 @@
 use anyhow::Result;
 use serde::Serialize;
 use std::fs;
-use std::io::Write;
 
 use crate::util::{
-    current_pid, detect_current_slot, ensure_runtime, log_file, message_file, other_slot,
+    current_pid, detect_current_slot, ensure_runtime, message_file, other_slot,
     state_file, timestamp, updated_file,
 };
 
@@ -64,9 +63,5 @@ pub fn write_state(state: &str, message: &str) {
 }
 
 pub fn write_log(msg: &str) {
-    ensure_runtime();
-    let line = format!("[{}] {}\n", timestamp(), msg);
-    if let Ok(mut f) = fs::OpenOptions::new().append(true).create(true).open(log_file()) {
-        let _ = f.write_all(line.as_bytes());
-    }
+    eprintln!("[{}] {}", timestamp(), msg);
 }
