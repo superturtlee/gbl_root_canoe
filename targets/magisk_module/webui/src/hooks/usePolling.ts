@@ -10,11 +10,9 @@ export function usePolling() {
     try {
       const s = getStatus();
       setStatus(s);
-      if (s.running) {
-        try {
-          setLog(getLog());
-        } catch {}
-      }
+      try {
+        setLog(getLog());
+      } catch {}
       const delay = s.running ? 3000 : 8000;
       timerRef.current = setTimeout(refresh, delay);
     } catch (e) {
