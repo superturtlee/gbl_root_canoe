@@ -29,6 +29,9 @@ esac
 RUNTIME_DIR="$MODPATH/tmp"
 BY_NAME_DIR="/dev/block/by-name"
 
+ui_print "- Ensure kernel has no Baseband Guard and BL is unlocked"
+ui_print "- Ensure device is 8gen5 / 8elitegen5"
+
 ui_print "============================================="
 ui_print "  Fresh install or OTA reinstall?"
 ui_print "  Vol+ = Fresh install (patches efisp)"
