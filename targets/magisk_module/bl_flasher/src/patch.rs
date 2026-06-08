@@ -52,7 +52,7 @@ pub fn patch_efisp(abl: &str, sfb: bool, debug: bool) -> Result<i32> {
             String::from_utf8_lossy(&status.stdout).trim()
         ));
         if !rt.join("injected.dll").exists() {
-            write_log("Injection failed");
+            write_log("Inject failed");
             return Ok(1);
         }
         let status = cmd_tool("GenFw")
@@ -68,7 +68,7 @@ pub fn patch_efisp(abl: &str, sfb: bool, debug: bool) -> Result<i32> {
             "GenFw: {}",
             String::from_utf8_lossy(&status.stdout).trim()
         ));
-        write_log("Injection complete");
+        write_log("Injected");
     }
 
     if debug {
