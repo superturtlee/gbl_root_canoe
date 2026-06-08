@@ -1,6 +1,6 @@
 id=fake_bl_efisp
-name=假回锁
-version=5.0
-versionCode=12
-author=zaomi
-description=自动刷新bl相关分区到非活动槽位
+name=Fake BL EFISP
+version=5.1
+versionCode=13
+author=zaomi, Dere3046, XtrLumen
+description=Automatically flash BL-related partitions to inactive slot
