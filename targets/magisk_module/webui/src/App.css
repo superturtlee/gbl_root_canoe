@@ -400,6 +400,48 @@ button:focus-visible {
   background: var(--md-sys-state-hover);
 }
 
+.lang-picker {
+  position: relative;
+}
+
+.lang-dropdown {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  z-index: 50;
+  min-width: 56px;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+  border-radius: var(--md-sys-shape-small);
+  background: var(--md-sys-color-surface-container-high);
+  box-shadow: var(--md-sys-elevation-3);
+}
+
+.lang-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font: var(--md-sys-typescale-label-large);
+  cursor: pointer;
+}
+
+.lang-item:hover {
+  background: var(--md-sys-state-hover);
+}
+
+.lang-item--active {
+  color: var(--md-sys-color-primary);
+  background: var(--md-sys-color-secondary-container);
+}
+
 .actions {
   display: flex;
   gap: 12px;
