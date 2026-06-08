@@ -50,12 +50,11 @@ export function getStatus(): Status {
   }
 }
 
-export function getLog(): string[] {
+export function getLog(): string {
   try {
-    const raw = run('log-json 200');
-    return JSON.parse(raw);
+    return run('log');
   } catch {
-    return [];
+    return '';
   }
 }
 

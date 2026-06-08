@@ -12,7 +12,7 @@ export function usePolling() {
       setStatus(s);
       if (s.running) {
         try {
-          setLog(getLog().join('\n'));
+          setLog(getLog());
         } catch {}
       }
       const delay = s.running ? 3000 : 8000;
