@@ -4,8 +4,11 @@ use std::fs;
 
 use crate::util::{
     current_pid, detect_current_slot, ensure_runtime, message_file, other_slot,
-    state_file, timestamp, updated_file,
+    state_file, updated_file,
 };
+
+// re-export from logging so call sites don't need to change their use paths
+pub use crate::logging::{write_log, write_state};
 
 #[derive(Serialize)]
 pub struct Status {
@@ -33,9 +36,15 @@ pub fn get_status() -> Status {
     let ts = other_slot(&cs).unwrap_or("-").to_string();
     let pid = current_pid();
     let running = pid.is_some();
-    let state = read_line(&state_file());
-    let message = read_line(&message_file());
-    let updated_at = read_line(&updated_file());
+
+    let (state, message, updated_at) = crate::logging::read_state_json()
+        .unwrap_or_else(|| {
+            (
+                read_line(&state_file()),
+                read_line(&message_file()),
+                read_line(&updated_file()),
+            )
+        });
 
     Status {
         current_slot: cs,
@@ -53,15 +62,4 @@ pub fn print_status() -> Result<()> {
     let json = serde_json::to_string(&s)?;
     println!("{}", json);
     Ok(())
-}
-
-pub fn write_state(state: &str, message: &str) {
-    ensure_runtime();
-    let _ = fs::write(state_file(), state);
-    let _ = fs::write(message_file(), message);
-    let _ = fs::write(updated_file(), timestamp());
-}
-
-pub fn write_log(msg: &str) {
-    eprintln!("[{}] {}", timestamp(), msg);
 }

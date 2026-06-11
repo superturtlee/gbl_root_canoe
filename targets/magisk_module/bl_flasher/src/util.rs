@@ -50,12 +50,6 @@ pub fn by_name_dir() -> &'static str {
     "/dev/block/by-name"
 }
 
-pub fn timestamp() -> String {
-    if let Ok(out) = Command::new("date").arg("+%Y-%m-%d %H:%M:%S").output() {
-        return String::from_utf8_lossy(&out.stdout).trim().to_string();
-    }
-    String::new()
-}
 
 pub fn detect_current_slot() -> Option<String> {
     let out = Command::new("getprop")
@@ -119,7 +113,7 @@ pub fn ensure_runtime() {
     }
     let uf = updated_file();
     if !uf.exists() {
-        let _ = fs::write(&uf, timestamp());
+        let _ = fs::write(&uf, crate::logging::timestamp());
     }
 }
 
