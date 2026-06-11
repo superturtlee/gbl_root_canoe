@@ -1,15 +1,3 @@
-// logging.rs — single source of truth for everything we write to disk.
-//
-// Previously there were three separate systems duct-taped together:
-//   - write_log()  → eprintln!, which only works because the child process
-//                    has stderr redirected to flash.log at spawn time.
-//                    Direct calls from the parent process silently disappear.
-//   - write_state() → three separate fs::write()s that are not atomic.
-//                     A reader can catch us mid-update and see stale state.
-//   - timestamp()  → forks a `date` process every single call.
-//
-// This module fixes all three problems.
-
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
@@ -23,9 +11,7 @@ use crate::util::{
     state_file, updated_file,
 };
 
-// ---------------------------------------------------------------------------
-// Timestamp — no more forking `date` on every log line.
-// ---------------------------------------------------------------------------
+//timestamp
 
 pub fn timestamp() -> String {
     // We need a human-readable string for the log; pulling in chrono for this
@@ -49,7 +35,7 @@ pub fn timestamp() -> String {
             let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
             let ydays = if leap { 366 } else { 365 };
             if d < ydays {
-                break (y, d);
+                break;
             }
             d -= ydays;
             y += 1;
@@ -118,9 +104,7 @@ pub fn write_log(msg: &str) {
     eprint!("{}", line);
 }
 
-// ---------------------------------------------------------------------------
-// State file — atomic write so readers never see partial state.
-// ---------------------------------------------------------------------------
+// State file
 
 // The old code wrote three separate files (state, message, updated) with
 // three separate fs::write() calls.  A concurrent reader could see any
@@ -174,10 +158,6 @@ pub fn write_state(state: &str, message: &str) {
     let _ = fs::write(updated_file(), timestamp());
 }
 
-// ---------------------------------------------------------------------------
-// Status struct — same API as before, no changes needed in callers.
-// ---------------------------------------------------------------------------
-
 #[derive(Serialize)]
 pub struct Status {
     pub current_slot: String,
@@ -229,7 +209,7 @@ pub fn get_status() -> Status {
 
 /// Parse the new single-JSON state file.  Returns None if the file doesn't
 /// exist yet or can't be parsed (e.g. device was on the old format).
-fn read_state_json() -> Option<(String, String, String)> {
+pub fn read_state_json() -> Option<(String, String, String)> {
     #[derive(serde::Deserialize)]
     struct S {
         state: String,
