@@ -7,6 +7,7 @@ mod flash;
 mod patch;
 mod status;
 mod util;
+mod logging;
 
 fn print_log(tail: bool) {
     let lf = crate::util::log_file();

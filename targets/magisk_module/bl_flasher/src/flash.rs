@@ -2,7 +2,6 @@ use anyhow::{bail, Result};
 use serde_json::json;
 use std::sync::OnceLock;
 use std::fs;
-use std::fs::OpenOptions;
 use std::process::{Command, Stdio};
 
 use crate::patch::{detect_gbl_vulnerability, patch_efisp};
@@ -38,6 +37,7 @@ fn parse_mode(mode: &str) -> (&str, bool, bool) {
 pub fn run_flash(mode: &str) -> Result<()> {
     set_path_env();
     ensure_runtime();
+    crate::logging::init_log(&crate::util::log_file());
 
     if !acquire_lock() {
         write_log("Task is already running");
@@ -184,31 +184,13 @@ pub fn start_flash(mode: &str) {
         }
     };
 
-    let lf = crate::util::log_file();
-    let _ = fs::write(&lf, "");
-
-    let file = match OpenOptions::new().create(true).append(true).open(&lf) {
-        Ok(f) => f,
-        Err(e) => {
-            println!("{}", json!({"started": false, "error": e.to_string()}));
-            return;
-        }
-    };
-
-    let stdout_dup = match file.try_clone() {
-        Ok(f) => f,
-        Err(_) => {
-            println!("{}", json!({"started": false, "error": "clone fd failed"}));
-            return;
-        }
-    };
-
     match Command::new(&exe)
         .arg("flash")
         .arg(mode)
-        .stdout(Stdio::from(stdout_dup))
-        .stderr(Stdio::from(file))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()
+    
     {
         Ok(_) => {
             std::thread::sleep(std::time::Duration::from_secs(1));
