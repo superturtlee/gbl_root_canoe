@@ -1,13 +1,17 @@
+SRCS := $(shell find src -name '*.c')
+CFLAGS := -O2 -Iinclude
+
 clean:
 	rm -rf build || true
-build: 
+
+build:
 	mkdir -p build
-	gcc -O2 -o build/patch_abl patch_abl.c
+	gcc $(CFLAGS) -o build/patch_abl $(SRCS)
 
 build_android:
 	mkdir -p build
-	$(NDK_PATH)/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang patch_abl.c -o build/patch_abl_android
+	$(NDK_PATH)/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang $(CFLAGS) -o build/patch_abl_android $(SRCS)
 
 build_windows:
 	mkdir -p build
-	x86_64-w64-mingw32-gcc -o ./build/patch_abl.exe patch_abl.c
+	x86_64-w64-mingw32-gcc $(CFLAGS) -o build/patch_abl.exe $(SRCS)
