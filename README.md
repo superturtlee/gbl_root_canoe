@@ -69,7 +69,7 @@ Download `generic_superfastboot.efi` and perform the relevant flashing steps. Du
 
 ### 5. OTA Upgrade
 Before rebooting for an OTA update, use the module to flash and retain the old ABL version. If you are doing a major version upgrade, it is recommended to check "Update efisp", otherwise the device might get stuck on the initial boot screen.
-
+- **WARNING: Please NOT try to upgrade your device to ColorOS/OxygenOS 16.0.8.302 and above! The bug was FIXED in these versions and the change might BRICK your device!**
 ### 6. Superfastboot Usage Instructions
 When OEM Unlocking is enabled and the white warning text appears on boot, you must press **Volume Down** to enter Superfastboot mode.
 Common commands include:
