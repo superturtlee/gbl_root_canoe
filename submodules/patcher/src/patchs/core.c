@@ -173,6 +173,7 @@ int32_t patch_adrl_unlocked_to_locked(char* buffer, int32_t size, uint64_t load_
 
 #include "patchs/oplus/warning.h"
 #include "patchs/oplus/forceenablefastboot.h"
+#include "patchs/oplus/olock_recovery.h"
 bool PatchBuffer(char* data, int32_t size) {
     if (patch_abl_gbl(data, size) != 0)
         printf("Warning: Failed to patch ABL GBL\n");
@@ -208,6 +209,9 @@ bool PatchBuffer(char* data, int32_t size) {
 
 
     //oplus
+    if (!patch_olock_recovery(data, size)) {
+        printf("OPlus Warning: patch_olock_recovery failed — recovery may be blocked on locked device\n");
+    }
     if (!patch_warning(data, size, global_var_offset)) {
         printf("OPlus Warning: patch_warning failed\n");
     }
