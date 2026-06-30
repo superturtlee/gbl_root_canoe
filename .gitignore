@@ -28,6 +28,10 @@ extracted/
 # VS Code
 .vscode/
 
+# dist dic itself, not only .elf files
+dist/
+targets/*/build
+
 submodules/uefi/edk2/build_modulepkg.log
 
 submodules/unsigned_abl.elf
