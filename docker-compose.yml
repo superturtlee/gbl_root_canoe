@@ -1,0 +1,10 @@
+services:
+  abl-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gbl-build-env:latest
+    volumes:
+      - .:/workspace
+    command: >
+      bash -c "make clean && make build && make build_module"
