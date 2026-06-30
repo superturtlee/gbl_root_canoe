@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: gbl-build-env:latest
+    image: gbl_builder:latest
     volumes:
       - .:/workspace
     command: >
