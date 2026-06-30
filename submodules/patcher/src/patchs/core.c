@@ -131,7 +131,7 @@ int32_t patch_adrl_unlocked_to_locked(char* buffer, int32_t size, uint64_t load_
         if (!str_at(buffer, size, off0, "unlocked")) continue;
         if (!str_at(buffer, size, off1, "locked"))   continue;
         bool match = false;
-        for(int j=i+16; j<=i+40;j+=4){
+        for(int j=i+16; j<=i+40;j+=4){ // when i reached size-24, j would reach to size+16, there is a obvious mem-overflow exploit
             DecodedInst c0 = decode_at(buffer, j);
             DecodedInst c1 = decode_at(buffer, j + 4);
             if(c0.type == INST_ADRP && c1.type == INST_ADD_X_IMM){
@@ -191,7 +191,8 @@ bool PatchBuffer(char* data, int32_t size) {
     int32_t num_patches = patch_abl_bootstate(data, size, &lock_register_num, &offset);
     if (num_patches == 0) {
         printf("Error: Failed to find/patch ABL Boot State\n");
-        free(data);
+        // free(data);
+        // caller is patch_abl.c, which has freed already. free there would cause double free. NCC, 2026-06-30
         return 0;
     }
     printf("Anchor offset : 0x%X\n", offset);
