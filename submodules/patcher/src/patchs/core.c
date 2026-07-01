@@ -191,7 +191,6 @@ bool PatchBuffer(char* data, int32_t size) {
     int32_t num_patches = patch_abl_bootstate(data, size, &lock_register_num, &offset);
     if (num_patches == 0) {
         printf("Error: Failed to find/patch ABL Boot State\n");
-        free(data);
         return 0;
     }
     printf("Anchor offset : 0x%X\n", offset);
