@@ -25,13 +25,13 @@ int32_t decode_imm19(uint32_t raw) {
     int32_t imm19 = (int32_t)((raw >> 5) & 0x7FFFF);
     if (imm19 & 0x40000)
         imm19 |= (int32_t)0xFFF80000; // sign extend bit 18 -> bit 31
-    return imm19 << 2;
+    return (int32_t)((uint32_t)imm19 << 2);
 }
 uint32_t read_instr(const char* buf, int32_t off) {
     return (uint8_t)buf[off]
-         | ((uint8_t)buf[off+1] << 8)
-         | ((uint8_t)buf[off+2] << 16)
-         | ((uint8_t)buf[off+3] << 24);
+         | ((uint32_t)(uint8_t)buf[off+1] << 8)
+         | ((uint32_t)(uint8_t)buf[off+2] << 16)
+         | ((uint32_t)(uint8_t)buf[off+3] << 24);
 }
 
 void write_instr(char* buf, int32_t off, uint32_t val) {
@@ -180,7 +180,7 @@ bool decode_inst_adrp(uint32_t raw, DecodedInst* out) {
     uint64_t immhi = (raw >> 5)  & 0x7FFFF;
     int64_t imm = (int64_t)((immhi << 2) | immlo);
     if (imm & (1LL << 20)) imm |= ~((1LL << 21) - 1);
-    out->simm = (int32_t)(imm << 12);  /* page-granular signed offset */
+    out->simm = (int32_t)((uint64_t)imm << 12);  /* page-granular signed offset */
     return true;
 }
 
