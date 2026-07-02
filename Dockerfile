@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y \
     gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
     zip vim xxd uuid-dev \
     nasm acpica-tools libssl-dev bc bison flex \
-    device-tree-compiler liblzma-dev\
+    device-tree-compiler liblzma-dev \
+    mingw-w64 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN wget https://apt.llvm.org/llvm.sh && \
@@ -24,5 +25,7 @@ RUN ln -s /usr/bin/clang-20 /usr/bin/clang && \
     ln -s /usr/bin/lld-20 /usr/bin/ld.lld && \
     ln -sf /usr/bin/llvm-objcopy-20 /usr/bin/llvm-objcopy && \
     ln -sf /usr/bin/llvm-strip-20 /usr/bin/llvm-strip
+
+ENV NDK_PATH=/opt/android-ndk
 
 WORKDIR /workspace

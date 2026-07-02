@@ -6,5 +6,6 @@ services:
     image: gbl_builder:latest
     volumes:
       - .:/workspace
+      - ${NDK_PATH:-/tmp/ndk}:/opt/android-ndk:ro
     command: >
-      bash -c "make clean && make build && make build_module"
+      bash -c "make clean && make target_toolkit_linux && make target_toolkit_windows"
