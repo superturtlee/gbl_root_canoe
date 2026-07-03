@@ -2,23 +2,16 @@
 
 ## 1. 下载 Release
 
-Release 分为以下两种类型：
+当前 Release 提供机型对应的已修补 ABL 文件：
 
-### 🔒 机型限定版（推荐）
+### 机型限定版
 
 文件名包含**手机型号**、**代号**及**对应 ABL 版本**，内含以下文件：
 
 | 文件名 | 说明 |
 |--------|------|
-| `ABL_with_superfastboot.efi` | 含 Super Fastboot（推荐） |
-| `ABL.efi` | 不含 Super Fastboot |
+| `ABL.efi` | 修补后的 ABL |
 | `ABL_original.efi` | 原版备份，**请勿刷入** |
-
-### 🌐 通用补丁版
-
-- `generic_superfastboot.efi`
-
-> **建议优先选择机型限定版，并优先选用 `superfastboot` 变体。**
 
 
 ## 2. 选择操作模式

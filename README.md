@@ -14,7 +14,7 @@ This section is for developers who want to compile the toolkits from source.
 You must be on a **Linux** host to build the project:
 - `gcc` / `clang`, `lld`, `make`, `zip`, `python3`
 - `liblzma-dev` (for compiling `extractfv`)
-- **Android NDK** (Required for `make build_module` to cross-compile tools for Android)
+- **Android NDK** (required for `make target_magisk_module` to cross-compile tools for Android; set `NDK_PATH` to the NDK directory)
 - **MinGW-w64**
 
 ### Build Targets
@@ -22,16 +22,35 @@ You must be on a **Linux** host to build the project:
 **Note:** You **do not** need to provide an `abl.img` to build the distributable toolkits or Magisk module.
 
 - **`make target_toolkit_linux`**
-  Builds the EDK2 native payload (`loader.elf`) and compiles the patching utilities (`extractfv`, `patch_abl`, `elf_inject`, etc.) for Linux.
+  Builds the Linux PC toolkit with `extractfv` and `patch_abl`. The zip is written to `targets/toolkit_linux/build/toolkit_linux.zip`.
 
 - **`make target_toolkit_windows`**
-  Similar to `dist_loader`, but cross-compiles the patching utilities into Windows `.exe` programs using MinGW-w64.
+  Builds the Windows PC toolkit and cross-compiles the patching utilities into `.exe` programs using MinGW-w64. The zip is written to `targets/toolkit_windows/build/toolkit_windows.zip`.
 
 - **`make target_magisk_module`**
-  Cross-compiles the patcher tools for Android using your NDK and builds the EDK2 payload.
+  Cross-compiles the patcher tools for Android using your NDK and packages the Magisk module. The zip is written to `targets/magisk_module/build/module_android.zip`.
 
-- **`make target_generic_efi`**
-  Embeds the patch tools, aiming to be universal across multiple device models. However, high-version compatibility is poor, and it is gradually being deprecated.
+- **`make tools_vbmetafixer_linux`** / **`make tools_vbmetafixer_windows`**
+  Builds the optional VBMeta fixer toolkit.
+
+### Docker Build
+
+You can build the Linux and Windows PC toolkits in the provided Docker image:
+
+```bash
+bash docker_build.sh
+bash run_docker.sh
+make clean
+make target_toolkit_linux
+make target_toolkit_windows
+```
+
+To build the Magisk module in Docker, install Android NDK on the host and pass it through `NDK_PATH`:
+
+```bash
+NDK_PATH=/path/to/android-ndk bash run_docker.sh
+make target_magisk_module
+```
 
 ---
 
@@ -57,15 +76,15 @@ When flashing the Magisk module via a root manager (like KernelSU, Magisk, or AP
 
 If you downloaded the `target_toolkit_linux` or `target_toolkit_windows` zip files:
 1. Extract the toolkit zip on your PC.
-2. Place your device's stock `abl.img` inside the `images/` (or `images\`) directory of the toolkit.
-3. **Linux:** Run `bash build.sh` (or `make build`). **Windows:** Run `build.bat`.
-4. The scripts will extract, patch, and inject the custom payload, outputting the modified file `ABL_with_superfastboot.efi`. (Check the output logs; if it says "Warning: Failed to patch ABL GBL", the device is not vulnerable and ABL needs to be downgraded).
+2. Place your device's stock ABL image inside the `images/` (or `images\`) directory of the toolkit as `abl.img` or `abl.elf`.
+3. **Linux:** Run `bash build.sh`. **Windows:** Run `build.bat`.
+4. The scripts will extract and patch the ABL payload, outputting `ABL.efi`, `ABL_original.efi`, and `patch_log.txt`. (Check the output logs; if it says "Warning: Failed to patch ABL GBL", the device is not vulnerable and ABL needs to be downgraded).
 
 ### 3. Using Pre-patched EFIs
-Download a specific release version that contains the phone model or codename in its filename. Use `ABL_with_superfastboot.efi` or `ABL.efi` from the package to boot or flash via `fastboot` commands (e.g., `fastboot flash efisp ABL_with_superfastboot.efi`). It is highly recommended to use the version with `superfastboot` to preserve fallback fastboot-flashing capabilities.
+Download a specific release version that contains the phone model or codename in its filename. Use `ABL.efi` from the package to boot or flash via `fastboot` commands (e.g., `fastboot flash efisp ABL.efi`).
 
 ### 4. Using Generic EFIs (Deprecated)
-Download `generic_superfastboot.efi` and perform the relevant flashing steps. Due to compatibility issues and instability across different OEM device features, it might perform poorly on certain models or OS versions, and is **no longer recommended**.
+Generic EFI builds are not part of the current Makefile targets. Use a device-specific patched `ABL.efi` instead.
 
 ### 5. OTA Upgrade
 Before rebooting for an OTA update, use the module to flash and retain the old ABL version. If you are doing a major version upgrade, it is recommended to check "Update efisp", otherwise the device might get stuck on the initial boot screen.
@@ -88,6 +107,5 @@ Common commands include:
 
 ### 7. Explanation of Different Variants
 1. `ABL.efi`: The patched ABL.
-2. `ABL_original`: For developers to analyze in IDA, used for error reporting. **DO NOT flash**.
-3. `ABL_with_superfastboot.efi`: The patched ABL integrated with superfastboot.
-4. `loader.elf`: The superfastboot binary file. Unlinked to EFI format, it is meant to link with toolbox. Cannot be flashed directly.
+2. `ABL_original.efi`: For developers to analyze in IDA, used for error reporting. **DO NOT flash**.
+3. `patch_log.txt`: Patch log generated by the toolkit.

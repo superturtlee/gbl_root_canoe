@@ -1,6 +1,8 @@
 SRCS := $(shell find src -name '*.c')
 CFLAGS := -O2 -Iinclude
 
+.PHONY: clean build build_android build_windows
+
 clean:
 	rm -rf build || true
 

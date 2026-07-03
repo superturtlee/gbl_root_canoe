@@ -1,26 +1,36 @@
-# 机型限定与通用版本构建指南
+# 构建指南
 
+## 依赖
 
-## 机型限定版本构建
+构建需要在 Linux 环境下进行。请安装 `gcc` 或 `clang`、`make`、`zip`、`python3`、`liblzma-dev`。如需构建 Windows 工具包，还需要 MinGW-w64；如需构建 Magisk 模块，需要安装 Android NDK 并设置 `NDK_PATH`。
 
-1. 将对应的 `abl.img` 文件放入项目目录下的 `./images` 文件夹中。
+## 发布包构建
 
-2. 执行以下命令进行编译：
-
-   ```bash
-   make build
-   ```
-
-
-## 通用版本构建
-
-执行以下命令，构建不依赖特定机型的通用版本：
+构建 Linux PC 工具包：
 
 ```bash
-make build_generic
+make target_toolkit_linux
 ```
 
+构建 Windows PC 工具包：
 
-> 备注：  
-> - 机型限定版本需准备对应设备的 `abl.img`，以保证兼容性。  
-> - 通用版本适用于多个设备，但可能存在兼容性和性能差异。
+```bash
+make target_toolkit_windows
+```
+
+构建 Magisk 模块：
+
+```bash
+NDK_PATH=/path/to/android-ndk make target_magisk_module
+```
+
+构建可选的 VBMeta fixer 工具：
+
+```bash
+make tools_vbmetafixer_linux
+make tools_vbmetafixer_windows
+```
+
+## 修补 ABL
+
+构建工具包本身不需要 ABL 镜像。如需修补设备镜像，请解压工具包，将官方镜像以 `images/abl.img` 或 `images/abl.elf` 文件名放入，然后在 Linux 执行 `bash build.sh`，或在 Windows 执行 `build.bat`。修补后的输出文件为 `ABL.efi`。

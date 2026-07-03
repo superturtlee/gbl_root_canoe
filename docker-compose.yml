@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: gbl_builder:latest
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - .:/workspace
       - ${NDK_PATH:-/tmp/ndk}:/opt/android-ndk:ro

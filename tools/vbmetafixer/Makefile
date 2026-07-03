@@ -1,3 +1,5 @@
+.PHONY: clean build build_windows
+
 clean:
 	rm -rf build || true
 build:

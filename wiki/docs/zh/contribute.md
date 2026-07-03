@@ -5,9 +5,9 @@
 
 1. Fork 本仓库（fork the repository）  
 2. 修改代码（make your code changes）  
-3. 提交前运行以下命令保证代码质量：  
+3. 提交前运行相关构建命令：  
    ```bash
-   make test
+   make target_toolkit_linux
    make clean
    ```  
 4. 提交 Pull Request（PR）

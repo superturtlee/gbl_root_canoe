@@ -1,8 +1,25 @@
+.PHONY: \
+	submodule_patcher_clean \
+	submodule_ablfvextractor_clean \
+	clean_submodules \
+	target_toolkit_windows_clean \
+	target_toolkit_linux_clean \
+	target_magisk_module_clean \
+	tools_vbmetafixer_clean \
+	targets_clean \
+	clean \
+	target_toolkit_windows \
+	target_toolkit_linux \
+	target_magisk_module \
+	dev_target_extract_and_patch \
+	tools_vbmetafixer_linux \
+	tools_vbmetafixer_windows
+
 submodule_patcher_clean:
 	cd submodules/patcher && make clean
 submodule_ablfvextractor_clean:
 	cd submodules/ablfvextractor && make clean
-clean_submodules: submodule_uefi_clean submodule_patcher_clean submodule_elflinker_clean submodule_ablfvextractor_clean
+clean_submodules: submodule_patcher_clean submodule_ablfvextractor_clean
 
 target_toolkit_windows_clean:
 	cd targets/toolkit_windows && make clean
@@ -10,9 +27,11 @@ target_toolkit_linux_clean:
 	cd targets/toolkit_linux && make clean
 target_magisk_module_clean:
 	cd targets/magisk_module && make clean
-targets_clean: clean_submodules target_generic_efi_clean target_toolkit_windows_clean target_toolkit_linux_clean target_magisk_module_clean
+tools_vbmetafixer_clean:
+	cd tools/vbmetafixer && make clean
+targets_clean: target_toolkit_windows_clean target_toolkit_linux_clean target_magisk_module_clean tools_vbmetafixer_clean
 
-clean: targets_clean clean_submodules
+clean: clean_submodules targets_clean
 
 target_toolkit_windows:
 	cd targets/toolkit_windows && make build 

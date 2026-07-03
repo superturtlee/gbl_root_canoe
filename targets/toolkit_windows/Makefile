@@ -1,3 +1,5 @@
+.PHONY: clean copy_resources submodule_patcher submodule_ablfvextractor build
+
 clean:
 	rm -rf build || true
 copy_resources:

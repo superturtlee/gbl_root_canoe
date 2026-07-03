@@ -2,23 +2,16 @@
 
 ## 1. Download the Release
 
-There are two types of releases available:
+Current releases provide device-specific patched ABL files:
 
-### 🔒 Device-Specific Version (Recommended)
+### Device-Specific Version
 
 The filename includes your **device model**, **codename**, and **corresponding ABL version**. It contains the following files:
 
 | Filename | Description |
 |----------|-------------|
-| `ABL_with_superfastboot.efi` | Includes Super Fastboot (Recommended) |
-| `ABL.efi` | Without Super Fastboot |
+| `ABL.efi` | Patched ABL |
 | `ABL_original.efi` | Original backup — **Do NOT flash** |
-
-### 🌐 Generic Patch Version
-
-- `generic_superfastboot.efi`
-
-> **It is recommended to use the device-specific version and prefer the `superfastboot` variant.**
 
 
 ## 2. Select Operation Mode
