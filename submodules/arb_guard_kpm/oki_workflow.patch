@@ -1,0 +1,108 @@
+diff --git a/.github/workflows/fastbuild_6.12.23.yml b/.github/workflows/fastbuild_6.12.23.yml
+index 09919cf..316c2a9 100644
+--- a/.github/workflows/fastbuild_6.12.23.yml
++++ b/.github/workflows/fastbuild_6.12.23.yml
+@@ -32,6 +32,11 @@ on:
+         required: true
+         type: boolean
+         default: 'false'
++      arb_guard_enable:
++        description: '是否启用ARB eFuse防熔断KPM(在开启kpm的前提下，拦截qcom_scm_update_rollback_version，阻止ColorOS 16.0.8+每次开机自动熔断ARB eFuse；需同时开启kpm)'
++        required: true
++        type: boolean
++        default: 'true'
+       lz4_enable:
+         description: '是否安装 lz4 1.10.0+zstd 1.5.7 补丁'
+         required: true
+@@ -703,7 +708,74 @@ jobs:
+           ./kptools-linux -p -i ./Image -k ./kpimg-linux -o ./oImage
+           rm -f Image
+           mv oImage Image
+-          
++
++      - name: 构建ARB Guard KPM
++        if: inputs.kpm_enable && inputs.arb_guard_enable
++        run: |
++          echo "正在构建ARB eFuse防熔断KPM..."
++          WORKDIR="$(pwd)"
++          CLANG="$WORKDIR/kernel_workspace/clang19/bin/clang"
++
++          # 下载KPatch-Next KPM头文件
++          mkdir -p arb_kpm_build
++          wget -q https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kpatch-next-headers.zip \
++            -O arb_kpm_build/kpn_headers.zip \
++            && unzip -q arb_kpm_build/kpn_headers.zip -d arb_kpm_build/headers \
++            || { echo "kpn headers not available as zip, fetching individually..."; \
++                 wget -q https://raw.githubusercontent.com/KernelSU-Next/KernelPatch/next/kernel/patch/include/kpm_utils.h \
++                   -O arb_kpm_build/kpm_utils.h 2>/dev/null \
++                 || wget -q https://raw.githubusercontent.com/bmax121/KernelPatch/main/kernel/patch/include/kpm_utils.h \
++                   -O arb_kpm_build/kpm_utils.h; }
++
++          # 写入arb_guard KPM源码
++          cat > arb_kpm_build/arb_guard.c << 'ARBC'
++          // arb_guard.c: suppress qcom_scm_update_rollback_version() ARB eFuse burn
++          #include <kpm_utils.h>
++          KPM_NAME("arb-guard");
++          KPM_VERSION("1.0.0");
++          KPM_DESCRIPTION("Suppress ARB eFuse burn via qcom_scm_update_rollback_version hook");
++          KPM_AUTHOR("gbl_root_canoe");
++          KPM_LICENSE("GPL v2");
++          static int (*orig_fn)(void) = NULL;
++          static int arb_guard_hook(void) {
++              pr_warn_once("arb_guard: qcom_scm_update_rollback_version suppressed\n");
++              return 0;
++          }
++          static long arb_init(const char *a, const char *e, void *r) {
++              int rc = hook_func("qcom_scm_update_rollback_version",
++                                 (void *)arb_guard_hook, (void **)&orig_fn);
++              if (rc) pr_err("arb_guard: hook failed %d\n", rc);
++              else    pr_info("arb_guard: hook installed\n");
++              return rc;
++          }
++          static long arb_ctrl(const char *a, const char *e, void *r) { return 0; }
++          static long arb_exit(void *r) {
++              unhook_func("qcom_scm_update_rollback_version",
++                          (void *)arb_guard_hook, (void **)&orig_fn);
++              return 0;
++          }
++          KPM_INIT(arb_init); KPM_CONTROL(arb_ctrl); KPM_EXIT(arb_exit);
++          ARBC
++
++          # KPM header path: zip layout or flat fallback
++          HDR_INCLUDE=""
++          if [ -d "arb_kpm_build/headers" ]; then
++            HDR_INCLUDE="-Iarb_kpm_build/headers"
++          else
++            HDR_INCLUDE="-Iarb_kpm_build"
++          fi
++
++          "$CLANG" --target=aarch64-linux-android31 \
++            -fPIC -shared \
++            $HDR_INCLUDE \
++            -O2 -fno-stack-protector \
++            -o arb_kpm_build/arb_guard.kpm \
++            arb_kpm_build/arb_guard.c \
++            && echo "ARB Guard KPM built successfully" \
++            || echo "WARNING: ARB Guard KPM build failed — KPM headers may need manual download"
++
++          ls -lh arb_kpm_build/arb_guard.kpm 2>/dev/null || true
++
+       - name: 克隆 AnyKernel3 并打包
+         id: create_zip
+         run: |
+@@ -733,6 +805,15 @@ jobs:
+           if [[ ${{ github.event.inputs.kpm_enable }} == 'true' ]]; then
+             wget https://github.com/cctv18/KPatch-Next/releases/latest/download/kpn.zip
+           fi
++          if [[ "${{ github.event.inputs.arb_guard_enable }}" == "true" && "${{ github.event.inputs.kpm_enable }}" == "true" ]]; then
++            if [ -f "${{ github.workspace }}/arb_kpm_build/arb_guard.kpm" ]; then
++              mkdir -p kpm
++              cp "${{ github.workspace }}/arb_kpm_build/arb_guard.kpm" kpm/arb_guard.kpm
++              echo "ARB Guard KPM included in AnyKernel3 zip (kpm/arb_guard.kpm)"
++            else
++              echo "WARNING: arb_guard.kpm not found, skipping inclusion"
++            fi
++          fi
+           if [[ -n "${{ github.event.inputs.kernel_suffix }}" ]]; then
+             AK3_NAME=AnyKernel3_${KSU_TYPENAME}_${{ env.KSUVER }}_${{ env.KERNEL_VERSION }}_${{ github.event.inputs.kernel_suffix }}.zip
+           else
