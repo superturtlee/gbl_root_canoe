@@ -1956,104 +1956,6 @@ CmdErase (IN CONST CHAR8 *arg, IN VOID *data, IN UINT32 sz)
     FastbootOkay ("");
   }
 }
-
-/*Function to set given slot as high priority
- *Arg: slot Suffix
- *Note: increase the priority of slot to max priority
- *at the same time decrease the priority of other
- *slots.
- */
-VOID
-CmdSetActive (CONST CHAR8 *Arg, VOID *Data, UINT32 Size)
-{
-  CHAR16 SetActive[MAX_GPT_NAME_SIZE] = L"boot";
-  CHAR8 *InputSlot = NULL;
-  CHAR16 InputSlotInUnicode[MAX_SLOT_SUFFIX_SZ];
-  CHAR16 InputSlotInUnicodetemp[MAX_SLOT_SUFFIX_SZ];
-  CONST CHAR8 *Delim = ":";
-  UINT16 j = 0;
-  BOOLEAN SlotVarUpdateComplete = FALSE;
-  UINT32 SlotEnd = 0;
-  BOOLEAN MultiSlotBoot = PartitionHasMultiSlot (L"boot");
-  Slot NewSlot = {{0}};
-  EFI_STATUS Status;
-
-  if (!MultiSlotBoot) {
-    FastbootFail ("This Command not supported");
-    return;
-  }
-
-  if (!Arg) {
-    FastbootFail ("Invalid Input Parameters");
-    return;
-  }
-
-
-  InputSlot = AsciiStrStr (Arg, Delim);
-  if (InputSlot) {
-    InputSlot++;
-    if (AsciiStrLen (InputSlot) >= MAX_SLOT_SUFFIX_SZ) {
-      FastbootFail ("Invalid Slot");
-      return;
-    }
-    if (!AsciiStrStr (InputSlot, "_")) {
-      AsciiStrToUnicodeStr (InputSlot, InputSlotInUnicodetemp);
-      StrnCpyS (InputSlotInUnicode, MAX_SLOT_SUFFIX_SZ, L"_", StrLen (L"_"));
-      StrnCatS (InputSlotInUnicode, MAX_SLOT_SUFFIX_SZ, InputSlotInUnicodetemp,
-                StrLen (InputSlotInUnicodetemp));
-    } else {
-      AsciiStrToUnicodeStr (InputSlot, InputSlotInUnicode);
-    }
-
-    if ((AsciiStrLen (InputSlot) == MAX_SLOT_SUFFIX_SZ - 2) ||
-        (AsciiStrLen (InputSlot) == MAX_SLOT_SUFFIX_SZ - 1)) {
-      SlotEnd = AsciiStrLen (InputSlot);
-      if ((InputSlot[SlotEnd] != '\0') ||
-          !AsciiStrStr (SlotSuffixArray, InputSlot)) {
-        DEBUG ((EFI_D_ERROR, "%a Invalid InputSlot Suffix\n", InputSlot));
-        FastbootFail ("Invalid Slot Suffix");
-        return;
-      }
-    }
-    /*Arg will be either _a or _b, so apppend it to boot*/
-    StrnCatS (SetActive, MAX_GPT_NAME_SIZE - 1, InputSlotInUnicode,
-              StrLen (InputSlotInUnicode));
-  } else {
-    FastbootFail ("set_active _a or _b should be entered");
-    return;
-  }
-
-  StrnCpyS (NewSlot.Suffix, ARRAY_SIZE (NewSlot.Suffix), InputSlotInUnicode,
-            StrLen (InputSlotInUnicode));
-  Status = SetActiveSlot (&NewSlot, TRUE);
-  if (Status != EFI_SUCCESS) {
-    FastbootFail ("set_active failed");
-    return;
-  }
-
-  // Updating fbvar `current-slot'
-  UnicodeStrToAsciiStr (GetCurrentSlotSuffix ().Suffix, CurrentSlotFB);
-
-  /* Here CurrentSlotFB will only have value of "_a" or "_b".*/
-  SKIP_FIRSTCHAR_IN_SLOT_SUFFIX (CurrentSlotFB);
-
-  do {
-    if (AsciiStrStr (BootSlotInfo[j].SlotSuffix, InputSlot)) {
-      AsciiStrnCpyS (BootSlotInfo[j].SlotSuccessfulVal, ATTR_RESP_SIZE, "no",
-                     AsciiStrLen ("no"));
-      AsciiStrnCpyS (BootSlotInfo[j].SlotUnbootableVal, ATTR_RESP_SIZE, "no",
-                     AsciiStrLen ("no"));
-      AsciiSPrint (BootSlotInfo[j].SlotRetryCountVal,
-                   sizeof (BootSlotInfo[j].SlotRetryCountVal), "%d",
-                   MAX_RETRY_COUNT);
-      SlotVarUpdateComplete = TRUE;
-    }
-    j++;
-  } while (!SlotVarUpdateComplete);
-
-  UpdatePartitionAttributes (PARTITION_ALL);
-  FastbootOkay ("");
-}
 #endif
 
 STATIC VOID
@@ -3544,7 +3446,6 @@ FastbootCommandSetup (IN VOID *Base, IN UINT64 Size)
 #ifdef ENABLE_UPDATE_PARTITIONS_CMDS
       {"flash:", CmdFlash},
       {"erase:", CmdErase},
-      {"set_active", CmdSetActive},
       {"flashing get_unlock_ability", CmdFlashingGetUnlockAbility},
       {"flashing unlock", CmdFlashingUnlock},
       {"flashing lock", CmdFlashingLock},
